@@ -1,116 +1,62 @@
 "use client";
-
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X, Home, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const navLinks = [
-  {
-    label: "How It Works",
-    href: "/#how-it-works",
-  },
-  {
-    label: "Features",
-    href: "/#features",
-  },
-  {
-    label: "Pricing",
-    href: "/pricing",
-  },
-  {
-    label: "FAQ",
-    href: "/faq",
-  },
-];
+import { Menu, X } from "lucide-react";
 
 export default function Navbar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-slate-200/60">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <Home className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-slate-900 text-lg leading-none">
-              HomeOffer<span className="gradient-text">Direct</span>
-            </span>
+    <header className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
+
+        {/* Logo */}
+        <Link href="/" className="font-bold text-gray-900 text-base tracking-tight" onClick={() => setOpen(false)}>
+          HomeOffer<span className="text-brand">Direct</span>
+        </Link>
+
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-6 text-sm text-gray-500">
+          <Link href="/#how-it-works" className="hover:text-gray-900 transition-colors">How it works</Link>
+          <Link href="/pricing"        className="hover:text-gray-900 transition-colors">Pricing</Link>
+          <Link href="/faq"            className="hover:text-gray-900 transition-colors">FAQ</Link>
+        </nav>
+
+        {/* Desktop CTA */}
+        <div className="hidden md:flex items-center gap-3">
+          <Link href="/login"  className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Log in</Link>
+          <Link href="/signup" className="text-sm font-semibold text-white brand-gradient px-4 py-2 rounded-lg hover:opacity-90 transition-opacity">
+            Get started
           </Link>
-
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="text-sm font-semibold text-white gradient-bg px-5 py-2 rounded-lg shadow-sm hover:shadow-md transition-all hover:opacity-90"
-            >
-              Start Free
-            </Link>
-          </div>
-
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
-          >
-            {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
+
+        {/* Mobile hamburger */}
+        <button
+          className="md:hidden p-2 text-gray-600"
+          onClick={() => setOpen(!open)}
+          aria-label="Menu"
+        >
+          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
       </div>
 
       {/* Mobile menu */}
-      {mobileOpen && (
-        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200/60 animate-fade-in">
-          <div className="px-4 py-4 space-y-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                onClick={() => setMobileOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2 mt-3">
-              <Link
-                href="/login"
-                className="block text-center py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg border border-slate-200 transition-all"
-                onClick={() => setMobileOpen(false)}
-              >
-                Log in
-              </Link>
-              <Link
-                href="/signup"
-                className="block text-center py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-sm transition-all"
-                onClick={() => setMobileOpen(false)}
-              >
-                Start Free
-              </Link>
-            </div>
+      {open && (
+        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 flex flex-col gap-1">
+          {[
+            { href: "/#how-it-works", label: "How it works" },
+            { href: "/pricing",       label: "Pricing" },
+            { href: "/faq",           label: "FAQ" },
+          ].map(l => (
+            <Link key={l.href} href={l.href}
+              className="py-3 text-sm text-gray-700 border-b border-gray-50 hover:text-blue-600 transition-colors"
+              onClick={() => setOpen(false)}>
+              {l.label}
+            </Link>
+          ))}
+          <div className="flex flex-col gap-2 pt-3">
+            <Link href="/login"  onClick={() => setOpen(false)} className="w-full text-center py-3 text-sm border border-gray-200 rounded-lg text-gray-700">Log in</Link>
+            <Link href="/signup" onClick={() => setOpen(false)} className="w-full text-center py-3 text-sm font-semibold text-white brand-gradient rounded-lg">Get started free</Link>
           </div>
         </div>
       )}

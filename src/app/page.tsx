@@ -9,7 +9,7 @@ import {
 /* ─── Hero ─────────────────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section className="pt-28 pb-20 px-4 sm:px-6 text-center bg-white">
+    <section className="pb-20 px-4 sm:px-6 text-center bg-white" style={{paddingTop:"max(7rem, calc(56px + env(safe-area-inset-top) + 40px))"}}>
       <div className="max-w-3xl mx-auto">
 
         {/* Badge */}

@@ -66,15 +66,15 @@ export default function OfferBuilder() {
   return (
     <div style={{minHeight:"100vh",background:"var(--gray-50)"}}>
       {/* ── Top bar ── */}
-      <div style={{position:"fixed",top:0,left:0,right:0,zIndex:50,background:"#fff",borderBottom:"1px solid var(--gray-200)"}}>
-        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 24px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+      <div style={{position:"fixed",top:0,left:0,right:0,zIndex:50,background:"#fff",borderBottom:"1px solid var(--gray-200)",paddingTop:"env(safe-area-inset-top)"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <Link href="/" style={{display:"flex",alignItems:"center",gap:8,textDecoration:"none"}}>
             <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#2563eb,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <Home style={{width:14,height:14,color:"#fff"}}/>
             </div>
             <span style={{fontWeight:700,color:"var(--gray-900)",fontSize:15}}>HomeOffer<span style={{color:"var(--blue)"}}>Direct</span></span>
           </Link>
-          <div style={{flex:1,maxWidth:360,margin:"0 32px"}}>
+          <div className="hidden sm:block" style={{flex:1,maxWidth:360,margin:"0 24px"}}>
             <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--gray-500)",marginBottom:6}}>
               <span style={{fontWeight:600,color:"var(--blue)"}}>{activeSection?.label}</span>
               <span>{pct}% complete</span>
@@ -89,8 +89,19 @@ export default function OfferBuilder() {
         </div>
       </div>
 
+      {/* Mobile progress bar — below the top bar, sm and below only */}
+      <div className="sm:hidden fixed left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 pb-2" style={{top:"calc(56px + env(safe-area-inset-top))"}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--gray-500)",marginBottom:4}}>
+          <span style={{fontWeight:600,color:"var(--blue)"}}>{activeSection?.label}</span>
+          <span>{pct}% complete</span>
+        </div>
+        <div style={{height:3,background:"var(--gray-100)",borderRadius:4,overflow:"hidden"}}>
+          <div style={{height:3,width:`${pct}%`,background:"linear-gradient(90deg,#2563eb,#7c3aed)",borderRadius:4,transition:"width .4s ease"}}/>
+        </div>
+      </div>
+
       {/* ── Layout ── */}
-      <div style={{maxWidth:1100,margin:"0 auto",padding:"80px 24px 80px",display:"grid",gridTemplateColumns:"220px 1fr",gap:32,alignItems:"start"}}>
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start" style={{maxWidth:1100,margin:"0 auto",paddingLeft:16,paddingRight:16,paddingBottom:80,paddingTop:"max(116px, calc(56px + env(safe-area-inset-top) + 36px))"}}>
 
         {/* Left sidebar — hidden on mobile via inline style trick */}
         <div style={{position:"sticky",top:80}} className="hidden md:block">

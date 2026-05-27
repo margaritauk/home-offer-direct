@@ -3,15 +3,15 @@ import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import { Search, Heart, Bed, Bath, Square, Sparkles, ArrowRight, SlidersHorizontal } from "lucide-react";
+import { Search, Heart, Bed, Bath, Square, Sparkles, ArrowRight, SlidersHorizontal, Phone, Mail } from "lucide-react";
 
 const PROPERTIES = [
-  { id:"1", address:"2847 N Clark St", city:"Chicago", state:"IL", price:485000, beds:3, baths:2, sqft:1850, dom:12, type:"Single Family", aiScore:87, aiLabel:"Great value", reduced:true, reduceAmt:15000, img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop" },
-  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago", state:"IL", price:625000, beds:4, baths:2.5, sqft:2400, dom:5, type:"Townhouse", aiScore:72, aiLabel:"Competitive", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&auto=format&fit=crop" },
-  { id:"3", address:"4521 N Ashland Ave", city:"Chicago", state:"IL", price:339000, beds:2, baths:1, sqft:1200, dom:28, type:"Condo", aiScore:91, aiLabel:"Best deal", reduced:true, reduceAmt:20000, img:"https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop" },
-  { id:"4", address:"3102 W Belmont Ave", city:"Chicago", state:"IL", price:549000, beds:3, baths:2, sqft:2100, dom:3, type:"Single Family", aiScore:65, aiLabel:"Act fast", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&auto=format&fit=crop" },
-  { id:"5", address:"7845 S Cottage Grove", city:"Chicago", state:"IL", price:229000, beds:3, baths:1.5, sqft:1600, dom:45, type:"Single Family", aiScore:95, aiLabel:"Negotiate!", reduced:true, reduceAmt:25000, img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&auto=format&fit=crop" },
-  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", price:795000, beds:4, baths:3, sqft:3200, dom:8, type:"Single Family", aiScore:78, aiLabel:"Well-priced", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&auto=format&fit=crop" },
+  { id:"1", address:"2847 N Clark St", city:"Chicago", state:"IL", price:485000, beds:3, baths:2, sqft:1850, dom:12, type:"Single Family", aiScore:87, aiLabel:"Great value", reduced:true, reduceAmt:15000, img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop", agent:{ name:"Sarah Johnson", phone:"(312) 555-0192", email:"sarah.johnson@coldwellbanker.com" } },
+  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago", state:"IL", price:625000, beds:4, baths:2.5, sqft:2400, dom:5, type:"Townhouse", aiScore:72, aiLabel:"Competitive", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&auto=format&fit=crop", agent:{ name:"Linda Park", phone:"(312) 555-0341", email:"lpark@bairdwarner.com" } },
+  { id:"3", address:"4521 N Ashland Ave", city:"Chicago", state:"IL", price:339000, beds:2, baths:1, sqft:1200, dom:28, type:"Condo", aiScore:91, aiLabel:"Best deal", reduced:true, reduceAmt:20000, img:"https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop", agent:{ name:"Mike Torres", phone:"(312) 555-0847", email:"m.torres@remax.com" } },
+  { id:"4", address:"3102 W Belmont Ave", city:"Chicago", state:"IL", price:549000, beds:3, baths:2, sqft:2100, dom:3, type:"Single Family", aiScore:65, aiLabel:"Act fast", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&auto=format&fit=crop", agent:{ name:"Donna Keller", phone:"(312) 555-0223", email:"d.keller@compass.com" } },
+  { id:"5", address:"7845 S Cottage Grove", city:"Chicago", state:"IL", price:229000, beds:3, baths:1.5, sqft:1600, dom:45, type:"Single Family", aiScore:95, aiLabel:"Negotiate!", reduced:true, reduceAmt:25000, img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&auto=format&fit=crop", agent:{ name:"James Wu", phone:"(312) 555-0519", email:"j.wu@atproperties.com" } },
+  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", price:795000, beds:4, baths:3, sqft:3200, dom:8, type:"Single Family", aiScore:78, aiLabel:"Well-priced", reduced:false, reduceAmt:0, img:"https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&auto=format&fit=crop", agent:{ name:"Rachel Bloom", phone:"(312) 555-0761", email:"r.bloom@sothebys.com" } },
 ];
 
 const fmt = (n: number) => "$" + n.toLocaleString();
@@ -95,6 +95,21 @@ export default function SearchPage() {
                   className="flex items-center justify-center gap-1.5 w-full py-2.5 brand-gradient text-white text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity">
                   Make an offer <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
+
+                {/* Agent contact */}
+                <div className="border-t border-gray-100 mt-3 pt-3">
+                  <p className="text-xs text-gray-400 mb-1.5">Listing agent: <span className="text-gray-600 font-medium">{p.agent.name}</span></p>
+                  <div className="flex gap-2">
+                    <a href={`tel:${p.agent.phone.replace(/\D/g,"")}`}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 flex-1 justify-center">
+                      <Phone className="w-3 h-3"/> Call
+                    </a>
+                    <a href={`mailto:${p.agent.email}?subject=Showing request — ${p.address}&body=Hi ${p.agent.name.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${p.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`}
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 hover:bg-blue-100 flex-1 justify-center">
+                      <Mail className="w-3 h-3"/> Schedule showing
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
           ))}

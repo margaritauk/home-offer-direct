@@ -7,11 +7,14 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100" style={{paddingTop:"env(safe-area-inset-top)"}}>
+    <header
+      className="fixed inset-x-0 top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
       <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
 
         {/* Logo */}
-        <Link href="/" className="font-bold text-gray-900 text-base tracking-tight" onClick={() => setOpen(false)}>
+        <Link href="/" className="font-bold text-gray-900 text-base tracking-tight flex-shrink-0" onClick={() => setOpen(false)}>
           HomeOffer<span className="text-brand">Direct</span>
         </Link>
 
@@ -19,14 +22,14 @@ export default function Navbar() {
         <nav className="hidden md:flex items-center gap-6 text-sm text-gray-500">
           <Link href="/#how-it-works" className="hover:text-gray-900 transition-colors">How it works</Link>
           <Link href="/pricing"        className="hover:text-gray-900 transition-colors">Pricing</Link>
-          <Link href="/faq"            className="hover:text-gray-900 transition-colors">FAQ</Link>
+          <Link href="/dashboard"      className="hover:text-gray-900 transition-colors">My dashboard</Link>
         </nav>
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
           <Link href="/login"  className="text-sm text-gray-500 hover:text-gray-900 transition-colors">Log in</Link>
-          <Link href="/signup" className="text-sm font-semibold text-white brand-gradient px-4 py-2 rounded-lg hover:opacity-90 transition-opacity">
-            Get started
+          <Link href="/offer-builder" className="text-sm font-semibold text-white brand-gradient px-4 py-2 rounded-lg hover:opacity-90 transition-opacity">
+            Start offer
           </Link>
         </div>
 
@@ -35,6 +38,7 @@ export default function Navbar() {
           className="md:hidden p-2 text-gray-600"
           onClick={() => setOpen(!open)}
           aria-label="Menu"
+          data-testid="mobile-menu-btn"
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -42,10 +46,11 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 flex flex-col gap-1">
+        <div className="md:hidden bg-white border-t border-gray-100 px-4 py-4 flex flex-col gap-1" data-testid="mobile-menu">
           {[
             { href: "/#how-it-works", label: "How it works" },
             { href: "/pricing",       label: "Pricing" },
+            { href: "/dashboard",     label: "My dashboard" },
             { href: "/faq",           label: "FAQ" },
           ].map(l => (
             <Link key={l.href} href={l.href}
@@ -56,7 +61,9 @@ export default function Navbar() {
           ))}
           <div className="flex flex-col gap-2 pt-3">
             <Link href="/login"  onClick={() => setOpen(false)} className="w-full text-center py-3 text-sm border border-gray-200 rounded-lg text-gray-700">Log in</Link>
-            <Link href="/signup" onClick={() => setOpen(false)} className="w-full text-center py-3 text-sm font-semibold text-white brand-gradient rounded-lg">Get started free</Link>
+            <Link href="/offer-builder" onClick={() => setOpen(false)} className="w-full text-center py-3 text-sm font-semibold text-white brand-gradient rounded-lg">
+              Start my offer — free
+            </Link>
           </div>
         </div>
       )}

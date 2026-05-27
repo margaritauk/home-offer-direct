@@ -241,7 +241,7 @@ export default function DashboardPage() {
         {activeTab==="offers" && (
           <div className="space-y-6" data-testid="offers-panel">
             {user.offers.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
+              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
                 <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
                 <p className="text-sm font-medium text-slate-500">No offers yet</p>
                 <p className="text-xs text-slate-400 mt-1 mb-4">Start by browsing homes or building an offer directly</p>
@@ -414,7 +414,7 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-5">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-7">
                 {MILESTONES.map((m, i) => (
                   <div key={i}
                     className={`flex items-start gap-4 px-5 py-4 ${i < MILESTONES.length-1 ? "border-b border-slate-50" : ""} ${m.status==="active" ? "bg-blue-50/40" : ""}`}>

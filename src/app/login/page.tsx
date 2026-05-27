@@ -46,9 +46,9 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
+        <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-10">
           <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Welcome back</h1>
-          <p className="text-slate-500 mb-6 text-sm">Sign in to continue your offers</p>
+          <p className="text-slate-500 mb-8 text-sm">Sign in to continue your offers</p>
 
           {error && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-3 mb-5">
@@ -57,7 +57,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-7" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Email address</label>
               <div className="relative">
@@ -91,7 +91,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-6">
+          <div className="flex items-center gap-3 my-7">
             <div className="flex-1 h-px bg-slate-200" />
             <span className="text-xs text-slate-400">or continue with</span>
             <div className="flex-1 h-px bg-slate-200" />
@@ -109,7 +109,7 @@ export default function LoginPage() {
             ))}
           </div>
 
-          <div className="mt-5 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <div className="mt-7 p-3 bg-blue-50 rounded-xl border border-blue-100">
             <p className="text-xs font-semibold text-blue-700 mb-1.5">Test accounts (password: test123)</p>
             <div className="space-y-1">
               {[

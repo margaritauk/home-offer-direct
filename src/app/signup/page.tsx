@@ -95,7 +95,7 @@ export default function SignupPage() {
         {/* Right: form */}
         <div className="p-8 sm:p-10">
           <h1 className="text-2xl font-extrabold text-slate-900 mb-1">Create your account</h1>
-          <p className="text-slate-500 mb-6 text-sm">Free to start — no credit card required</p>
+          <p className="text-slate-500 mb-8 text-sm">Free to start — no credit card required</p>
 
           {error && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-3 mb-5">
@@ -104,7 +104,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          <form className="space-y-5" onSubmit={handleSubmit}>
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Full name</label>
               <div className="relative">
@@ -162,7 +162,7 @@ export default function SignupPage() {
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-5">
+          <div className="flex items-center gap-3 my-7">
             <div className="flex-1 h-px bg-slate-200" />
             <span className="text-xs text-slate-400">or sign up with</span>
             <div className="flex-1 h-px bg-slate-200" />

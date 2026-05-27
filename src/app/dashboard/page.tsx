@@ -112,42 +112,42 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24">
 
         {/* Welcome header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-12">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
               Welcome back, {user.name.split(" ")[0]}
             </h1>
-            <p className="text-slate-500 mt-0.5">{headerSub}</p>
+            <p className="text-slate-500 mt-2">{headerSub}</p>
           </div>
           <Link href="/offer-builder"
-            className="flex items-center gap-2 gradient-bg text-white font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm">
+            className="flex items-center gap-2 gradient-bg text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm">
             <PlusCircle className="w-4 h-4" /> New Offer
           </Link>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           {stats.map(({ icon: Icon, label, value, sub }) => (
-            <div key={label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
+            <div key={label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-5">
                 <Icon className="w-5 h-5 text-blue-600" />
               </div>
-              <p className="text-2xl font-black text-slate-900 mb-0.5">{value}</p>
+              <p className="text-2xl font-black text-slate-900 mb-2">{value}</p>
               <p className="text-sm font-medium text-slate-700">{label}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+              <p className="text-xs text-slate-400 mt-2">{sub}</p>
             </div>
           ))}
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-6 w-fit" data-testid="tabs">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 w-fit" data-testid="tabs">
           {(["overview","offers","saved","journey"] as Tab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               data-testid={`tab-${tab}`}
-              className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-all flex items-center gap-1.5 ${activeTab===tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              className={`px-6 py-2.5 rounded-lg text-sm font-medium capitalize transition-all flex items-center gap-1.5 ${activeTab===tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
               {tab==="journey" && !features.journeyTracker && <Lock className="w-3 h-3"/>}
               {tab==="journey" ? "My Journey" : tab}
             </button>
@@ -156,9 +156,9 @@ export default function DashboardPage() {
 
         {/* ── Overview ── */}
         {activeTab==="overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="font-semibold text-slate-900">Recent Offers</h2>
                 <button onClick={() => setActiveTab("offers")}
                   className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
@@ -166,7 +166,7 @@ export default function DashboardPage() {
                 </button>
               </div>
               {user.offers.length === 0 ? (
-                <div className="p-10 text-center">
+                <div className="p-14 text-center">
                   <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
                   <p className="text-sm font-medium text-slate-500">No offers yet</p>
                   <Link href="/offer-builder" className="inline-flex items-center gap-1.5 mt-4 text-sm text-blue-600 font-semibold hover:underline">
@@ -176,8 +176,8 @@ export default function DashboardPage() {
               ) : (
                 <div className="divide-y divide-slate-100" data-testid="offers-panel">
                   {user.offers.slice(0, 3).map(o => (
-                    <div key={o.id} className="p-5 flex items-center gap-4 hover:bg-slate-50 transition-colors">
-                      <div className="w-14 h-14 rounded-xl bg-cover bg-center flex-shrink-0"
+                    <div key={o.id} className="p-6 flex items-center gap-5 hover:bg-slate-50 transition-colors">
+                      <div className="w-16 h-16 rounded-xl bg-cover bg-center flex-shrink-0"
                         style={{backgroundImage:`url(${o.img})`}}/>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate">{o.address}</p>
@@ -212,19 +212,19 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-6 py-4 border-b border-slate-100">
+              <div className="px-8 py-5 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
               </div>
               <div className="divide-y divide-slate-100">
                 {AI_RECS.map(rec => {
                   const Icon = rec.icon;
                   return (
-                    <div key={rec.title} className="p-5">
-                      <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-3`}>
+                    <div key={rec.title} className="p-7">
+                      <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
                         <Icon className="w-4 h-4" />
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-1">{rec.title}</h3>
-                      <p className="text-xs text-slate-500 leading-relaxed mb-3">{rec.desc}</p>
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2">{rec.title}</h3>
+                      <p className="text-xs text-slate-500 leading-relaxed mb-4">{rec.desc}</p>
                       <Link href={rec.action === "Browse Homes" ? "/search" : "/offer-builder"}
                         className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
                         {rec.action} <ChevronRight className="w-3 h-3" />
@@ -239,9 +239,9 @@ export default function DashboardPage() {
 
         {/* ── Offers tab ── */}
         {activeTab==="offers" && (
-          <div className="space-y-4" data-testid="offers-panel">
+          <div className="space-y-6" data-testid="offers-panel">
             {user.offers.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+              <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                 <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
                 <p className="text-sm font-medium text-slate-500">No offers yet</p>
                 <p className="text-xs text-slate-400 mt-1 mb-4">Start by browsing homes or building an offer directly</p>
@@ -256,10 +256,10 @@ export default function DashboardPage() {
                 const statusLabel = { pending:"Pending", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted" }[status];
                 return (
                   <div key={status}>
-                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">{statusLabel}</h3>
-                    <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">{statusLabel}</h3>
+                    <div className="space-y-4">
                       {group.map(offer => (
-                        <div key={offer.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex items-center gap-6">
+                        <div key={offer.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 flex items-center gap-6">
                           <div className="w-20 h-20 rounded-xl bg-cover bg-center flex-shrink-0"
                             style={{backgroundImage:`url(${offer.img})`}}/>
                           <div className="flex-1">
@@ -276,15 +276,15 @@ export default function DashboardPage() {
                                 <p className="text-xs text-slate-400 mt-1">{offer.date}</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-3 mt-4 flex-wrap">
+                            <div className="flex items-center gap-3 mt-6 flex-wrap">
                               {offer.status==="draft" && (
                                 <Link href="/offer-builder"
-                                  className="flex items-center gap-1.5 text-sm px-4 py-2 gradient-bg text-white rounded-xl font-semibold hover:opacity-90">
+                                  className="flex items-center gap-1.5 text-sm px-5 py-2.5 gradient-bg text-white rounded-xl font-semibold hover:opacity-90">
                                   <FileText className="w-4 h-4"/> Continue Offer
                                 </Link>
                               )}
                               {offer.status==="pending" && (
-                                <button className="flex items-center gap-1.5 text-sm px-4 py-2 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100">
+                                <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100">
                                   <MessageSquare className="w-4 h-4"/> Follow Up
                                 </button>
                               )}
@@ -295,7 +295,7 @@ export default function DashboardPage() {
                                 </Link>
                               )}
                               {features.pdfDownload ? (
-                                <button className="flex items-center gap-1.5 text-sm px-4 py-2 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">
+                                <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">
                                   <Download className="w-4 h-4"/> Download
                                 </button>
                               ) : (
@@ -315,7 +315,7 @@ export default function DashboardPage() {
             )}
 
             {user.offers.length >= features.maxOffers && (
-              <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-4">
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-5">
                 <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0"/>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-amber-800">You&apos;ve reached your offer limit</p>
@@ -329,9 +329,9 @@ export default function DashboardPage() {
 
         {/* ── Saved tab ── */}
         {activeTab==="saved" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="saved-panel">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="saved-panel">
             {savedHomes.length === 0 ? (
-              <div className="col-span-full text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+              <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-slate-200">
                 <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
                 <p className="text-sm font-medium text-slate-500">No saved homes yet</p>
                 <p className="text-xs text-slate-400 mt-1 mb-4">Browse listings and tap the heart to save homes you like</p>
@@ -351,27 +351,27 @@ export default function DashboardPage() {
                         <Sparkles className="w-3 h-3"/> {p.aiScore}
                       </div>
                     </div>
-                    <div className="p-5">
+                    <div className="p-7">
                       <p className="font-semibold text-slate-900">{p.address}</p>
-                      <div className="flex items-center gap-1 text-slate-500 text-xs mb-3">
+                      <div className="flex items-center gap-1 text-slate-500 text-xs mb-4">
                         <MapPin className="w-3 h-3"/> {p.city}
                       </div>
-                      <p className="text-2xl font-black text-slate-900 mb-3">{formatCurrency(p.price)}</p>
-                      <div className="flex items-center gap-3 text-sm text-slate-600 mb-4">
+                      <p className="text-2xl font-black text-slate-900 mb-5">{formatCurrency(p.price)}</p>
+                      <div className="flex items-center gap-3 text-sm text-slate-600 mb-6">
                         <span className="flex items-center gap-1"><Bed className="w-4 h-4"/>{p.beds} bd</span>
                         <span className="flex items-center gap-1"><Bath className="w-4 h-4"/>{p.baths} ba</span>
                       </div>
                       <Link href={`/offer-builder?property=${p.id}`}
-                        className="w-full flex items-center justify-center gap-2 gradient-bg text-white font-semibold py-2.5 rounded-xl hover:opacity-90 transition-all text-sm">
+                        className="w-full flex items-center justify-center gap-2 gradient-bg text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all text-sm">
                         Make an Offer <ChevronRight className="w-4 h-4"/>
                       </Link>
                     </div>
-                    <div className="border-t border-slate-100 px-5 py-3 bg-slate-50/80">
-                      <p className="text-xs text-slate-400 mb-1.5">Listing agent</p>
+                    <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/80">
+                      <p className="text-xs text-slate-400 mb-2">Listing agent</p>
                       <p className="text-sm font-medium text-slate-900">
                         {p.agent.name} · <span className="text-slate-500 font-normal">{p.agent.company}</span>
                       </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
+                      <div className="flex flex-wrap gap-2 mt-3">
                         <a href={`tel:${p.agent.phone.replace(/\D/g,"")}`}
                           data-testid="agent-phone"
                           className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">
@@ -401,15 +401,15 @@ export default function DashboardPage() {
         {activeTab==="journey" && (
           features.journeyTracker ? (
             <div data-testid="journey-panel">
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-5">
-                <div className="flex items-center justify-between mb-3">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7 mb-7">
+                <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-semibold text-slate-900">Your home buying progress</p>
                   <span className="text-sm font-bold text-blue-600">3 of 8 complete</span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2.5">
                   <div className="h-2.5 rounded-full gradient-bg transition-all" style={{width:"37.5%"}}/>
                 </div>
-                <p className="text-xs text-amber-600 mt-2 flex items-center gap-1.5">
+                <p className="text-xs text-amber-600 mt-3 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5"/> Next: Schedule your home inspector before Jun 3
                 </p>
               </div>

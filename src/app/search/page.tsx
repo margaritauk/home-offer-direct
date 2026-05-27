@@ -157,8 +157,8 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           <div className="absolute bottom-3 right-3 bg-red-500 text-white text-xs px-2 py-1 rounded-lg font-semibold">Hot Market</div>
         )}
       </div>
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-2">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
           <div>
             <p className="text-2xl font-black text-slate-900">{formatCurrency(property.price)}</p>
             {property.priceChange !== 0 && (
@@ -170,16 +170,16 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           </div>
           <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">{property.type}</span>
         </div>
-        <div className="flex items-center gap-1 mb-3">
+        <div className="flex items-center gap-1 mb-4">
           <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
           <p className="text-sm text-slate-700 truncate">{property.address}, {property.city}, {property.state} {property.zip}</p>
         </div>
-        <div className="flex items-center gap-4 text-sm text-slate-600 mb-4 pb-4 border-b border-slate-100">
+        <div className="flex items-center gap-4 text-sm text-slate-600 mb-5 pb-5 border-b border-slate-100">
           <div className="flex items-center gap-1"><Bed className="w-4 h-4 text-slate-400"/><span className="font-medium">{property.beds}</span><span className="text-slate-400 text-xs">bd</span></div>
           <div className="flex items-center gap-1"><Bath className="w-4 h-4 text-slate-400"/><span className="font-medium">{property.baths}</span><span className="text-slate-400 text-xs">ba</span></div>
           <div className="flex items-center gap-1"><Square className="w-4 h-4 text-slate-400"/><span className="font-medium">{property.sqft.toLocaleString()}</span><span className="text-slate-400 text-xs">sqft</span></div>
         </div>
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-3 mb-4">
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4 mb-5">
           <div className="flex items-center gap-1.5 mb-1">
             <Sparkles className="w-3.5 h-3.5 text-blue-500"/>
             <span className="text-xs font-semibold text-blue-700">AI Suggested Offer Range</span>
@@ -189,7 +189,7 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           </p>
         </div>
         <Link href={`/offer-builder?property=${property.id}`}
-          className="flex items-center justify-center gap-2 w-full gradient-bg text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-all text-sm shadow-sm">
+          className="flex items-center justify-center gap-2 w-full gradient-bg text-white font-semibold py-4 rounded-xl hover:opacity-90 transition-all text-sm shadow-sm">
           Make an Offer <Sparkles className="w-4 h-4"/>
         </Link>
       </div>

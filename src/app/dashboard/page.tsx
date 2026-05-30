@@ -417,7 +417,7 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-7">
                 {MILESTONES.map((m, i) => (
                   <div key={i}
-                    className={`flex items-start gap-4 px-5 py-4 ${i < MILESTONES.length-1 ? "border-b border-slate-50" : ""} ${m.status==="active" ? "bg-blue-50/40" : ""}`}>
+                    className={`flex items-start gap-5 px-7 py-5 ${i < MILESTONES.length-1 ? "border-b border-slate-50" : ""} ${m.status==="active" ? "bg-blue-50/40" : ""}`}>
                     <div className="mt-0.5 flex-shrink-0">
                       {m.status==="done" ? <CheckCircle2 className="w-5 h-5 text-green-500"/>
                         : m.status==="active" ? <Clock className="w-5 h-5 text-blue-500"/>
@@ -440,14 +440,14 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
-                <div className="flex items-center gap-2 mb-4">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7">
+                <div className="flex items-center gap-2 mb-6">
                   <CalendarDays className="w-4 h-4 text-blue-500"/>
                   <p className="text-sm font-semibold text-slate-900">Key contract dates</p>
                   <span className="text-xs text-slate-400 ml-auto">2847 N Clark St offer</span>
                 </div>
                 {CALENDAR_DATES.map((c, i) => (
-                  <div key={i} className={`flex items-center gap-4 py-2.5 ${i < CALENDAR_DATES.length-1 ? "border-b border-slate-50" : ""}`}>
+                  <div key={i} className={`flex items-center gap-4 py-3.5 ${i < CALENDAR_DATES.length-1 ? "border-b border-slate-50" : ""}`}>
                     <div className={`text-sm font-bold w-14 flex-shrink-0 ${c.warn ? "text-amber-600" : "text-slate-400"}`}>{c.date}</div>
                     <div className="flex items-center gap-2 flex-1">
                       {c.warn && <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0"/>}
@@ -459,12 +459,12 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : (
-            <div data-testid="journey-panel" className="bg-white rounded-2xl border border-slate-100 shadow-sm p-10 text-center">
-              <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+            <div data-testid="journey-panel" className="bg-white rounded-2xl border border-slate-100 shadow-sm p-14 text-center">
+              <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-6">
                 <Lock className="w-6 h-6 text-blue-400"/>
               </div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">Journey Tracker is a Basic feature</h3>
-              <p className="text-sm text-slate-500 mb-6 max-w-xs mx-auto">
+              <h3 className="text-lg font-semibold text-slate-900 mb-3">Journey Tracker is a Basic feature</h3>
+              <p className="text-sm text-slate-500 mb-8 max-w-xs mx-auto">
                 Track your milestones, key deadlines, and closing date in one place. Upgrade to unlock.
               </p>
               <Link href="/pricing"

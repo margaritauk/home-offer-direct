@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "HomeOfferDirect",
+    "slug": "home-offer-direct",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "homeofferdirect",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.homeofferdirect.app"
+    },
+    "android": {
+      "package": "com.homeofferdirect.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#2563EB"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#2563EB",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

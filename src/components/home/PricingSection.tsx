@@ -8,8 +8,7 @@ const plans = [
     period: "one-time",
     description: "Perfect for buyers ready to make a single, well-prepared offer.",
     badge: null,
-    color: "border-slate-200",
-    buttonColor: "bg-slate-900 hover:bg-slate-800 text-white",
+    featured: false,
     features: [
       "State-specific purchase agreement",
       "AI offer wizard (8 steps)",
@@ -33,8 +32,7 @@ const plans = [
     period: "one-time",
     description: "The complete offer toolkit with AI guidance and advanced features.",
     badge: "Most Popular",
-    color: "border-blue-500 shadow-2xl shadow-blue-100",
-    buttonColor: "gradient-bg text-white hover:opacity-90",
+    featured: true,
     features: [
       "Everything in Basic",
       "AI negotiation copilot",
@@ -55,8 +53,7 @@ const plans = [
     period: "/month",
     description: "For investors and active buyers making multiple offers.",
     badge: "Best Value",
-    color: "border-purple-200",
-    buttonColor: "bg-purple-600 hover:bg-purple-700 text-white",
+    featured: false,
     features: [
       "Everything in Premium",
       "Unlimited offers",
@@ -96,11 +93,15 @@ export default function PricingSection() {
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-white rounded-3xl border-2 ${plan.color} p-8 transition-all duration-300 hover:-translate-y-1 ${plan.badge === "Most Popular" ? "scale-105" : ""}`}
+              className={`relative bg-white rounded-3xl border-2 p-8 transition-all duration-300 hover:-translate-y-1 ${
+                plan.featured
+                  ? "border-blue-500 shadow-2xl shadow-blue-100 scale-105"
+                  : "border-slate-200"
+              }`}
             >
               {plan.badge && (
-                <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs font-bold text-white ${plan.badge === "Most Popular" ? "gradient-bg" : "bg-purple-600"}`}>
-                  {plan.badge === "Most Popular" && <Star className="w-3 h-3 inline mr-1" />}
+                <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 flex items-center gap-1">
+                  {plan.featured && <Star className="w-3 h-3" />}
                   {plan.badge}
                 </div>
               )}
@@ -116,7 +117,11 @@ export default function PricingSection() {
 
               <Link
                 href="/signup"
-                className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-all mb-8 ${plan.buttonColor}`}
+                className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition-all mb-8 ${
+                  plan.featured
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
+                    : "bg-slate-900 hover:bg-slate-800 text-white"
+                }`}
               >
                 Get Started
                 <ArrowRight className="w-4 h-4" />
@@ -125,7 +130,7 @@ export default function PricingSection() {
               <ul className="space-y-2.5">
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2.5 text-sm text-slate-700">
-                    <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                    <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                     {feature}
                   </li>
                 ))}
@@ -141,7 +146,7 @@ export default function PricingSection() {
         </div>
 
         {/* Free trial note */}
-        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-3xl p-8 border border-blue-100 text-center">
+        <div className="bg-blue-50 rounded-3xl p-8 border border-blue-100 text-center">
           <div className="flex items-center justify-center gap-2 mb-3">
             <Zap className="w-5 h-5 text-blue-600" />
             <h3 className="text-xl font-bold text-slate-900">Try Before You Buy</h3>
@@ -152,7 +157,7 @@ export default function PricingSection() {
           </p>
           <Link
             href="/search"
-            className="inline-flex items-center gap-2 gradient-bg text-white font-bold px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg"
           >
             Start Free Preview
             <ArrowRight className="w-4 h-4" />

@@ -7,7 +7,6 @@ const testimonials = [
     saved: "$14,500",
     rating: 5,
     photo: "JM",
-    color: "bg-blue-500",
     quote:
       "I was terrified to buy a home without an agent but HomeOfferDirect held my hand through every single step. The AI explained each term so clearly. We closed in 45 days and saved over $14K!",
     home: "Purchased $485,000 home in Lincoln Park",
@@ -18,7 +17,6 @@ const testimonials = [
     saved: "$18,200",
     rating: 5,
     photo: "DK",
-    color: "bg-purple-500",
     quote:
       "As engineers, we wanted to understand everything we were signing. The plain-English explanations were incredible. The AI negotiation tips helped us get $12K off asking price!",
     home: "Purchased $607,000 home in South Austin",
@@ -29,7 +27,6 @@ const testimonials = [
     saved: "$22,800",
     rating: 5,
     photo: "MT",
-    color: "bg-emerald-500",
     quote:
       "Made three offers before finding our home. The dashboard made tracking everything so easy. On our third offer, the AI escalation clause builder is what got us the house in a bidding war.",
     home: "Purchased $760,000 home in Burbank",
@@ -40,7 +37,6 @@ const testimonials = [
     saved: "$31,500",
     rating: 5,
     photo: "PP",
-    color: "bg-orange-500",
     quote:
       "I'm a first-time buyer with zero real estate experience. HomeOfferDirect felt like having a knowledgeable friend guide me. The document generation is flawless and incredibly professional.",
     home: "Purchased $1.05M condo in Brooklyn",
@@ -51,7 +47,6 @@ const testimonials = [
     saved: "$16,800",
     rating: 5,
     photo: "RC",
-    color: "bg-sky-500",
     quote:
       "The listing agent was impressed by how professional our offer package looked. She told us it was better than most agent-submitted offers she receives. Closed in 30 days!",
     home: "Purchased $560,000 home in Coral Gables",
@@ -62,7 +57,6 @@ const testimonials = [
     saved: "$9,300",
     rating: 5,
     photo: "AJ",
-    color: "bg-pink-500",
     quote:
       "The AI suggestions for contingencies literally saved me from a nightmare — it flagged that I should include an inspection contingency when I almost waived it in a hot market. Worth every penny.",
     home: "Purchased $310,000 home in Plano",
@@ -75,7 +69,7 @@ export default function TestimonialsSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="inline-block text-sm font-semibold text-amber-600 bg-amber-50 px-4 py-1.5 rounded-full mb-4">
+          <span className="inline-block text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full mb-4">
             Real Success Stories
           </span>
           <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5">
@@ -113,9 +107,7 @@ export default function TestimonialsSection() {
               {/* Author */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 ${t.color} rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}
-                  >
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                     {t.photo}
                   </div>
                   <div>
@@ -124,7 +116,7 @@ export default function TestimonialsSection() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-black text-green-600">{t.saved}</p>
+                  <p className="text-lg font-black text-slate-900">{t.saved}</p>
                   <p className="text-xs text-slate-500">saved</p>
                 </div>
               </div>

@@ -54,7 +54,7 @@ export default function SavingsSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left: calculator */}
           <div>
-            <span className="inline-block text-sm font-semibold text-green-600 bg-green-50 px-4 py-1.5 rounded-full mb-4">
+            <span className="inline-block text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full mb-4">
               Real Savings
             </span>
             <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5 leading-tight">
@@ -142,14 +142,14 @@ export default function SavingsSection() {
 
           {/* Right: what's included */}
           <div>
-            <div className="bg-gradient-to-br from-blue-600 to-purple-700 rounded-3xl p-8 text-white shadow-2xl">
+            <div className="bg-blue-600 rounded-3xl p-8 text-white shadow-2xl">
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <p className="font-bold text-lg">What&apos;s Included</p>
-                  <p className="text-blue-200 text-sm">With every offer package</p>
+                  <p className="text-blue-100 text-sm">With every offer package</p>
                 </div>
               </div>
 
@@ -165,9 +165,9 @@ export default function SavingsSection() {
               <div className="bg-white/10 rounded-2xl p-5 mb-6">
                 <div className="flex items-baseline gap-2 mb-1">
                   <span className="text-4xl font-black">$29</span>
-                  <span className="text-blue-200 text-sm">one-time</span>
+                  <span className="text-blue-100 text-sm">one-time</span>
                 </div>
-                <p className="text-blue-200 text-sm">Single offer · No subscription required</p>
+                <p className="text-blue-100 text-sm">Single offer · No subscription required</p>
               </div>
 
               <a

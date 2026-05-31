@@ -22,7 +22,7 @@ export default function HeroSection() {
 
       {/* Floating elements */}
       <div className="absolute top-32 left-8 lg:left-24 w-72 h-72 bg-blue-400/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-24 right-8 lg:right-24 w-96 h-96 bg-purple-400/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-24 right-8 lg:right-24 w-96 h-96 bg-blue-300/10 rounded-full blur-3xl" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 text-center">
         {/* Badge */}
@@ -96,7 +96,7 @@ export default function HeroSection() {
         <div className="flex flex-wrap items-center justify-center gap-4 mb-16 animate-fade-in-up delay-400">
           {trustBadges.map((badge) => (
             <div key={badge} className="flex items-center gap-1.5 text-sm text-slate-600">
-              <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+              <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
               {badge}
             </div>
           ))}
@@ -105,7 +105,7 @@ export default function HeroSection() {
         {/* Social proof */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 animate-fade-in-up delay-500">
           <div className="flex -space-x-2">
-            {["bg-blue-400", "bg-purple-400", "bg-green-400", "bg-orange-400", "bg-pink-400"].map(
+            {["bg-blue-600", "bg-blue-500", "bg-blue-400", "bg-slate-600", "bg-slate-500"].map(
               (color, i) => (
                 <div
                   key={i}
@@ -213,10 +213,10 @@ export default function HeroSection() {
                 <div className="bg-white rounded-xl p-4 border border-slate-200">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-slate-700">Offer Strength</span>
-                    <span className="text-sm font-bold text-emerald-600">Strong ↑</span>
+                    <span className="text-sm font-bold text-blue-600">Strong ↑</span>
                   </div>
                   <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="w-4/5 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" />
+                    <div className="w-4/5 h-3 rounded-full bg-blue-500" />
                   </div>
                   <div className="flex justify-between mt-1.5 text-xs text-slate-400">
                     <span>Weak</span>

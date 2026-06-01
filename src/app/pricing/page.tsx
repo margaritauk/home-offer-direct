@@ -93,8 +93,8 @@ const plans = [
     priceNote: "Billed monthly · Cancel anytime",
     cta: "Start Pro",
     ctaHref: "/signup?plan=pro",
-    color: "border-purple-200",
-    ctaColor: "bg-purple-600 hover:bg-purple-700 text-white",
+    color: "border-slate-200",
+    ctaColor: "bg-slate-800 hover:bg-slate-900 text-white",
     popular: false,
     features: [
       { text: "Everything in Premium", included: true },
@@ -197,7 +197,7 @@ export default function PricingPage() {
                   {plan.features.map((feature) => (
                     <li key={feature.text} className="flex items-start gap-2 text-xs">
                       {feature.included ? (
-                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0 mt-0.5" />
+                        <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
                       ) : (
                         <X className="w-4 h-4 text-slate-300 flex-shrink-0 mt-0.5" />
                       )}
@@ -226,13 +226,13 @@ export default function PricingPage() {
               },
               {
                 icon: Shield,
-                color: "text-green-600 bg-green-50",
+                color: "text-blue-600 bg-blue-50",
                 title: "100% Satisfaction Guarantee",
                 desc: "Full refund within 24 hours if you haven't downloaded your documents.",
               },
               {
                 icon: MessageSquare,
-                color: "text-purple-600 bg-purple-50",
+                color: "text-blue-600 bg-blue-50",
                 title: "Human Support Available",
                 desc: "Our team of real estate experts is available via email and chat for all paid plans.",
               },

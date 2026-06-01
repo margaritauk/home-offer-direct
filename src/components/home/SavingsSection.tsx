@@ -54,15 +54,14 @@ export default function SavingsSection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Left: calculator */}
           <div>
-            <span className="inline-block text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full mb-4">
-              Real Savings
-            </span>
-            <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5 leading-tight">
-              Stop paying{" "}
-              <span className="line-through text-slate-400">$15,000</span>{" "}
-              <span className="gradient-text">in commissions</span>
+            <p className="section-label">Real savings</p>
+            <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-5 leading-tight">
+              Stop handing over{" "}
+              <span className="line-through text-slate-300">$15,000</span>
+              <br />
+              <span className="gradient-text">in agent commission.</span>
             </h2>
-            <p className="text-xl text-slate-500 mb-10 leading-relaxed">
+            <p className="text-lg text-slate-600 mb-10 leading-relaxed">
               The traditional buyer&apos;s agent commission is 2-3% of the purchase price. On a
               $500K home, that&apos;s up to $15,000 — money that could be your down payment.
             </p>

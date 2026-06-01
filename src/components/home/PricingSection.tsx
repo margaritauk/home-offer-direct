@@ -76,14 +76,13 @@ export default function PricingSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="inline-block text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full mb-4">
-            Simple Pricing
-          </span>
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5">
-            Transparent pricing,{" "}
-            <span className="gradient-text">massive savings</span>
+          <p className="section-label">Simple pricing</p>
+          <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-5">
+            One small fee.
+            <br />
+            <span className="gradient-text">Thousands saved.</span>
           </h2>
-          <p className="text-xl text-slate-500 leading-relaxed">
+          <p className="text-lg text-slate-600 leading-relaxed">
             Pay a fraction of agent commission. No hidden fees. No subscription required.
           </p>
         </div>

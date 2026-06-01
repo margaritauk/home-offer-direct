@@ -1,15 +1,15 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Menu, X, Home, LogOut, User, ChevronDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const navLinks = [
-  { label:"How It Works", href:"/#how-it-works" },
-  { label:"Features",     href:"/#features" },
-  { label:"Pricing",      href:"/pricing" },
-  { label:"FAQ",          href:"/faq" },
+  { label: "How It Works", href: "/#how-it-works" },
+  { label: "Features",     href: "/#features" },
+  { label: "Pricing",      href: "/pricing" },
+  { label: "FAQ",          href: "/faq" },
 ];
 
 export default function Navbar() {
@@ -17,6 +17,7 @@ export default function Navbar() {
   const [userOpen, setUserOpen] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleLogout = () => {
     logout();
@@ -25,83 +26,120 @@ export default function Navbar() {
     router.push("/");
   };
 
+  const isActive = (href: string) =>
+    href !== "/" && pathname === href.replace("/#", "/#") ? false : pathname === href;
+
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-slate-200/60"
-      style={{paddingTop:"env(safe-area-inset-top)"}}>
-      <div className="max-w-7xl mx-auto"
-        style={{paddingLeft:"max(16px,env(safe-area-inset-left))",paddingRight:"max(16px,env(safe-area-inset-right))"}}>
+    <header
+      className="fixed top-0 left-0 right-0 z-50 glass border-b border-slate-200/50"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <div
+        className="max-w-7xl mx-auto"
+        style={{
+          paddingLeft: "max(24px,env(safe-area-inset-left))",
+          paddingRight: "max(24px,env(safe-area-inset-right))",
+        }}
+      >
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group flex-shrink-0" onClick={() => setMobileOpen(false)}>
-            <div className="w-8 h-8 rounded-lg gradient-bg flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 group flex-shrink-0"
+            onClick={() => setMobileOpen(false)}
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm group-hover:bg-blue-700 transition-colors">
               <Home className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-slate-900 text-lg leading-none">
-              HomeOffer<span className="gradient-text">Direct</span>
+            <span className="font-bold text-slate-900 text-[15px] tracking-tight">
+              HomeOffer<span className="text-blue-600">Direct</span>
             </span>
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navLinks.map(link => (
-              <Link key={link.href} href={link.href}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
+          <nav className="hidden md:flex items-center gap-0.5">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="relative px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100/70 transition-all group"
+              >
                 {link.label}
               </Link>
             ))}
             {user && (
-              <Link href="/dashboard"
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all">
-                My Dashboard
+              <Link
+                href="/dashboard"
+                className="relative px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100/70 transition-all"
+              >
+                Dashboard
               </Link>
             )}
           </nav>
 
           {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
             {user ? (
               <div className="relative">
-                <button onClick={() => setUserOpen(o => !o)}
-                  className="flex items-center gap-2 text-sm text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl hover:bg-slate-100 transition-all">
-                  <div className="w-7 h-7 rounded-full gradient-bg flex items-center justify-center text-white text-xs font-bold">
+                <button
+                  onClick={() => setUserOpen((o) => !o)}
+                  className="flex items-center gap-2 text-sm text-slate-700 hover:text-slate-900 pl-2 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all"
+                >
+                  <div className="w-7 h-7 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
                     {user.name.charAt(0)}
                   </div>
                   <span className="font-medium">{user.name.split(" ")[0]}</span>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold capitalize">{user.tier}</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400"/>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold capitalize border border-blue-100">
+                    {user.tier}
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${userOpen ? "rotate-180" : ""}`} />
                 </button>
                 {userOpen && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg py-1 w-44 z-50">
-                    <Link href="/dashboard" onClick={() => setUserOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
-                      <User className="w-4 h-4 text-slate-400"/> My Dashboard
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl py-1.5 w-48 z-50 animate-scale-in">
+                    <Link
+                      href="/dashboard"
+                      onClick={() => setUserOpen(false)}
+                      className="flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <User className="w-4 h-4 text-slate-400" />
+                      My Dashboard
                     </Link>
-                    <button onClick={handleLogout}
-                      className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50">
-                      <LogOut className="w-4 h-4"/> Log out
+                    <div className="mx-3 my-1.5 h-px bg-slate-100" />
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2.5 w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign out
                     </button>
                   </div>
                 )}
               </div>
             ) : (
               <>
-                <Link href="/login"
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all">
-                  Log in
+                <Link
+                  href="/login"
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-100 transition-all"
+                >
+                  Sign in
                 </Link>
-                <Link href="/signup"
-                  className="text-sm font-semibold text-white gradient-bg px-5 py-2 rounded-lg shadow-sm hover:shadow-md transition-all hover:opacity-90">
-                  Start Free
+                <Link
+                  href="/signup"
+                  className="text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-xl transition-all shadow-sm shadow-blue-200"
+                >
+                  Get started free
                 </Link>
               </>
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <button className="md:hidden p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
+          {/* Mobile button */}
+          <button
+            className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-all"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
-            data-testid="mobile-menu-btn">
+            data-testid="mobile-menu-btn"
+          >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
@@ -109,56 +147,72 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-white/95 backdrop-blur-xl border-t border-slate-200/60"
+        <div
+          className="md:hidden bg-white border-t border-slate-100 shadow-lg"
           data-testid="mobile-menu"
-          style={{paddingLeft:"max(16px,env(safe-area-inset-left))",paddingRight:"max(16px,env(safe-area-inset-right))"}}>
-          <div className="py-4 space-y-1">
-            {navLinks.map(link => (
-              <Link key={link.href} href={link.href}
-                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                onClick={() => setMobileOpen(false)}>
+          style={{
+            paddingLeft: "max(20px,env(safe-area-inset-left))",
+            paddingRight: "max(20px,env(safe-area-inset-right))",
+          }}
+        >
+          <div className="py-3 space-y-0.5">
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                onClick={() => setMobileOpen(false)}
+              >
                 {link.label}
               </Link>
             ))}
             {user && (
-              <Link href="/dashboard"
-                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                onClick={() => setMobileOpen(false)}>
-                My Dashboard
+              <Link
+                href="/dashboard"
+                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                onClick={() => setMobileOpen(false)}
+              >
+                Dashboard
               </Link>
             )}
-            <div className="pt-3 border-t border-slate-100 flex flex-col gap-2 mt-3">
-              {user ? (
-                <>
-                  <div className="flex items-center gap-2 px-4 py-2">
-                    <div className="w-8 h-8 rounded-full gradient-bg flex items-center justify-center text-white text-xs font-bold">
-                      {user.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-                      <p className="text-xs text-slate-500 capitalize">{user.tier} plan</p>
-                    </div>
+          </div>
+          <div className="pb-4 pt-2 border-t border-slate-100 flex flex-col gap-2 mx-2">
+            {user ? (
+              <>
+                <div className="flex items-center gap-3 px-3 py-2.5">
+                  <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
+                    {user.name.charAt(0)}
                   </div>
-                  <button onClick={handleLogout}
-                    className="block text-center py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-all">
-                    Log out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link href="/login"
-                    className="block text-center py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-lg border border-slate-200 transition-all"
-                    onClick={() => setMobileOpen(false)}>
-                    Log in
-                  </Link>
-                  <Link href="/signup"
-                    className="block text-center py-2.5 text-sm font-semibold text-white gradient-bg rounded-lg shadow-sm transition-all"
-                    onClick={() => setMobileOpen(false)}>
-                    Start Free
-                  </Link>
-                </>
-              )}
-            </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{user.name}</p>
+                    <p className="text-xs text-slate-500 capitalize">{user.tier} plan</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-center py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl border border-red-100 transition-all"
+                >
+                  Sign out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="text-center py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-xl border border-slate-200 transition-all"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="text-center py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  Get started free
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

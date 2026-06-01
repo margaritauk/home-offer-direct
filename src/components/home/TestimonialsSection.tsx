@@ -5,109 +5,100 @@ const testimonials = [
     name: "Jennifer Martinez",
     location: "Chicago, IL",
     saved: "$14,500",
-    rating: 5,
     photo: "JM",
     quote:
-      "I was terrified to buy a home without an agent but HomeOfferDirect held my hand through every single step. The AI explained each term so clearly. We closed in 45 days and saved over $14K!",
-    home: "Purchased $485,000 home in Lincoln Park",
+      "I was terrified to buy without an agent but HomeOfferDirect guided me through every step. The AI explained each term so clearly. We closed in 45 days and saved over $14K.",
+    home: "$485,000 home in Lincoln Park",
   },
   {
     name: "David & Sarah Kim",
     location: "Austin, TX",
     saved: "$18,200",
-    rating: 5,
     photo: "DK",
     quote:
-      "As engineers, we wanted to understand everything we were signing. The plain-English explanations were incredible. The AI negotiation tips helped us get $12K off asking price!",
-    home: "Purchased $607,000 home in South Austin",
+      "As engineers, we wanted to understand every clause we signed. The plain-English explanations were incredible. The AI negotiation tips helped us get $12K off asking.",
+    home: "$607,000 home in South Austin",
   },
   {
     name: "Marcus Thompson",
     location: "Los Angeles, CA",
     saved: "$22,800",
-    rating: 5,
     photo: "MT",
     quote:
-      "Made three offers before finding our home. The dashboard made tracking everything so easy. On our third offer, the AI escalation clause builder is what got us the house in a bidding war.",
-    home: "Purchased $760,000 home in Burbank",
+      "Made three offers before finding our home. The dashboard made tracking everything effortless. The AI escalation clause builder is what won us the home in a bidding war.",
+    home: "$760,000 home in Burbank",
   },
   {
     name: "Priya Patel",
     location: "New York, NY",
     saved: "$31,500",
-    rating: 5,
     photo: "PP",
     quote:
-      "I'm a first-time buyer with zero real estate experience. HomeOfferDirect felt like having a knowledgeable friend guide me. The document generation is flawless and incredibly professional.",
-    home: "Purchased $1.05M condo in Brooklyn",
+      "First-time buyer with zero real estate experience. HomeOfferDirect felt like a knowledgeable friend walking me through everything. The document quality is genuinely flawless.",
+    home: "$1.05M condo in Brooklyn",
   },
   {
     name: "Robert & Lisa Chen",
     location: "Miami, FL",
     saved: "$16,800",
-    rating: 5,
     photo: "RC",
     quote:
-      "The listing agent was impressed by how professional our offer package looked. She told us it was better than most agent-submitted offers she receives. Closed in 30 days!",
-    home: "Purchased $560,000 home in Coral Gables",
+      "The listing agent told us our offer package was better than most agent-submitted offers she sees. That's a direct quote. We closed in 30 days.",
+    home: "$560,000 home in Coral Gables",
   },
   {
     name: "Amanda Johnson",
     location: "Dallas, TX",
     saved: "$9,300",
-    rating: 5,
     photo: "AJ",
     quote:
-      "The AI suggestions for contingencies literally saved me from a nightmare — it flagged that I should include an inspection contingency when I almost waived it in a hot market. Worth every penny.",
-    home: "Purchased $310,000 home in Plano",
+      "The AI flagged that I should keep my inspection contingency when I almost waived it in a hot market. That advice alone was worth far more than the $99 I paid.",
+    home: "$310,000 home in Plano",
   },
 ];
 
 export default function TestimonialsSection() {
   return (
-    <section className="py-24 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-32 bg-white">
+      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+
         {/* Header */}
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="inline-block text-sm font-semibold text-blue-600 bg-blue-50 px-4 py-1.5 rounded-full mb-4">
-            Real Success Stories
-          </span>
-          <h2 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5">
+        <div className="max-w-2xl mx-auto text-center mb-20">
+          <p className="section-label">Real results</p>
+          <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-5">
             Buyers love{" "}
             <span className="gradient-text">HomeOfferDirect</span>
           </h2>
-          <p className="text-xl text-slate-500">
-            Join thousands of buyers who skipped the agent and kept their commissions.
+          <p className="text-lg text-slate-600">
+            Thousands of buyers skipped the agent and kept their commission.
           </p>
         </div>
 
-        {/* Testimonials grid */}
-        <div className="columns-1 sm:columns-2 lg:columns-3 gap-6 space-y-6">
+        {/* Grid */}
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-5 space-y-5">
           {testimonials.map((t, i) => (
             <div
               key={i}
-              className="break-inside-avoid bg-white rounded-2xl p-6 border border-slate-100 shadow-sm hover:shadow-lg transition-all duration-300"
+              className="break-inside-avoid bg-white rounded-2xl p-7 border border-slate-100 shadow-sm hover:shadow-md transition-all duration-200"
             >
               {/* Stars */}
-              <div className="flex gap-1 mb-4">
-                {[...Array(t.rating)].map((_, s) => (
+              <div className="flex gap-0.5 mb-5">
+                {[...Array(5)].map((_, s) => (
                   <Star key={s} className="w-4 h-4 fill-amber-400 text-amber-400" />
                 ))}
               </div>
 
-              {/* Quote */}
-              <Quote className="w-6 h-6 text-slate-200 mb-2" />
-              <p className="text-slate-700 leading-relaxed text-sm mb-5">{t.quote}</p>
+              <p className="text-[15px] text-slate-700 leading-relaxed mb-6">&ldquo;{t.quote}&rdquo;</p>
 
-              {/* Property */}
-              <div className="bg-slate-50 rounded-xl px-3 py-2 mb-4">
-                <p className="text-xs text-slate-500">{t.home}</p>
+              {/* Property tag */}
+              <div className="text-xs text-slate-400 bg-slate-50 rounded-lg px-3 py-2 mb-5 inline-block">
+                Purchased {t.home}
               </div>
 
-              {/* Author */}
-              <div className="flex items-center justify-between">
+              {/* Author + savings */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  <div className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                     {t.photo}
                   </div>
                   <div>
@@ -116,27 +107,26 @@ export default function TestimonialsSection() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-black text-slate-900">{t.saved}</p>
-                  <p className="text-xs text-slate-500">saved</p>
+                  <p className="text-base font-bold text-slate-900">{t.saved}</p>
+                  <p className="text-xs text-slate-400">saved</p>
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Trust stats */}
-        <div className="mt-16 bg-white rounded-3xl border border-slate-100 shadow-sm p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        {/* Trust row */}
+        <div className="mt-20 bg-slate-50 rounded-2xl border border-slate-100 p-8 lg:p-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center divide-x divide-slate-200">
             {[
-              { value: "2,400+", label: "Offers submitted", sub: "and counting" },
-              { value: "$28M+", label: "Total savings", sub: "in commissions" },
-              { value: "4.9/5", label: "Average rating", sub: "from verified buyers" },
-              { value: "5 States", label: "State coverage", sub: "expanding monthly" },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <p className="text-3xl sm:text-4xl font-black text-slate-900 mb-1">{stat.value}</p>
-                <p className="text-sm font-semibold text-slate-700">{stat.label}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{stat.sub}</p>
+              { value: "2,400+", label: "Offers submitted" },
+              { value: "$28M+",  label: "Commissions saved" },
+              { value: "4.9/5",  label: "Average rating" },
+              { value: "5",      label: "States covered" },
+            ].map((s, i) => (
+              <div key={s.label} className={i > 0 ? "pl-8" : ""}>
+                <p className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-1">{s.value}</p>
+                <p className="text-sm text-slate-500">{s.label}</p>
               </div>
             ))}
           </div>

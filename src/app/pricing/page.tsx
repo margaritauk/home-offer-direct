@@ -138,7 +138,7 @@ export default function PricingPage() {
       {/* Hero */}
       <section className="pt-28 pb-16 gradient-bg-soft">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <span className="inline-block text-sm font-semibold text-blue-600 bg-white/80 px-4 py-1.5 rounded-full mb-4 border border-blue-200">
+          <span className="inline-flex items-center text-sm font-semibold text-blue-600 bg-white/80 px-4 py-1.5 rounded-full mb-4 border border-blue-200">
             Simple, Transparent Pricing
           </span>
           <h1 className="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-5">

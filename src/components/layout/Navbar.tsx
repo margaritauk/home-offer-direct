@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Menu, X, Home, LogOut, User, ChevronDown } from "lucide-react";
+import { Menu, X, Home, LogOut, User, ChevronDown, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const navLinks = [
@@ -27,7 +27,7 @@ export default function Navbar() {
   };
 
   const isActive = (href: string) =>
-    href !== "/" && pathname === href.replace("/#", "/#") ? false : pathname === href;
+    href !== "/" && pathname === href ? true : false;
 
   return (
     <header
@@ -45,7 +45,7 @@ export default function Navbar() {
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 group flex-shrink-0"
+            className="flex items-center gap-2 group flex-shrink-0"
             onClick={() => setMobileOpen(false)}
           >
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shadow-sm group-hover:bg-blue-700 transition-colors">
@@ -62,7 +62,11 @@ export default function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="relative px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100/70 transition-all group"
+                className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-all ${
+                  isActive(link.href)
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                }`}
               >
                 {link.label}
               </Link>
@@ -70,7 +74,11 @@ export default function Navbar() {
             {user && (
               <Link
                 href="/dashboard"
-                className="relative px-3.5 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100/70 transition-all"
+                className={`px-3.5 py-2 text-sm font-medium rounded-lg transition-all ${
+                  pathname === "/dashboard"
+                    ? "text-blue-600 bg-blue-50"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+                }`}
               >
                 Dashboard
               </Link>
@@ -133,34 +141,34 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile button */}
+          {/* Mobile hamburger */}
           <button
-            className="md:hidden p-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-all"
+            className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Toggle menu"
-            data-testid="mobile-menu-btn"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu — dropdown panel */}
       {mobileOpen && (
         <div
-          className="md:hidden bg-white border-t border-slate-100 shadow-lg"
-          data-testid="mobile-menu"
+          className="md:hidden bg-white border-t border-slate-100"
           style={{
-            paddingLeft: "max(20px,env(safe-area-inset-left))",
-            paddingRight: "max(20px,env(safe-area-inset-right))",
+            paddingLeft: "max(16px,env(safe-area-inset-left))",
+            paddingRight: "max(16px,env(safe-area-inset-right))",
+            paddingBottom: "max(16px,env(safe-area-inset-bottom))",
           }}
         >
-          <div className="py-3 space-y-0.5">
+          {/* Nav links */}
+          <nav className="pt-2 pb-3">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                className="flex items-center px-3 py-2.5 text-[15px] font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
                 {link.label}
@@ -169,51 +177,56 @@ export default function Navbar() {
             {user && (
               <Link
                 href="/dashboard"
-                className="block px-4 py-3 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                className="flex items-center gap-2.5 px-3 py-2.5 text-[15px] font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
+                <LayoutDashboard className="w-4 h-4 text-slate-400" />
                 Dashboard
               </Link>
             )}
-          </div>
-          <div className="pb-4 pt-2 border-t border-slate-100 flex flex-col gap-2 mx-2">
-            {user ? (
-              <>
-                <div className="flex items-center gap-3 px-3 py-2.5">
-                  <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold">
-                    {user.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{user.name}</p>
-                    <p className="text-xs text-slate-500 capitalize">{user.tier} plan</p>
-                  </div>
+          </nav>
+
+          {/* Divider */}
+          <div className="h-px bg-slate-100 mx-1 mb-3" />
+
+          {/* Auth section */}
+          {user ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-3 px-3 py-2 mb-1">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+                  {user.name.charAt(0)}
                 </div>
-                <button
-                  onClick={handleLogout}
-                  className="text-center py-3 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl border border-red-100 transition-all"
-                >
-                  Sign out
-                </button>
-              </>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-center py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 rounded-xl border border-slate-200 transition-all"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/signup"
-                  className="text-center py-3 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"
-                  onClick={() => setMobileOpen(false)}
-                >
-                  Get started free
-                </Link>
-              </>
-            )}
-          </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate">{user.name}</p>
+                  <p className="text-xs text-slate-500 capitalize">{user.tier} plan</p>
+                </div>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-[15px] font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign out
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 pb-1">
+              <Link
+                href="/login"
+                className="flex items-center justify-center py-2.5 text-[15px] font-medium text-slate-700 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl transition-all"
+                onClick={() => setMobileOpen(false)}
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="flex items-center justify-center py-2.5 text-[15px] font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"
+                onClick={() => setMobileOpen(false)}
+              >
+                Get started
+              </Link>
+            </div>
+          )}
         </div>
       )}
     </header>

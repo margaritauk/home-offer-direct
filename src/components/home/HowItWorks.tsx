@@ -49,8 +49,6 @@ export default function HowItWorks() {
   return (
     <section id="how-it-works" className="py-32 bg-white">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
-
-        {/* Header */}
         <div className="max-w-2xl mx-auto text-center mb-20">
           <p className="section-label">Simple process</p>
           <h2 className="text-4xl sm:text-5xl font-bold text-slate-900 mb-5">
@@ -63,7 +61,6 @@ export default function HowItWorks() {
           </p>
         </div>
 
-        {/* Steps grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
           {steps.map((step, index) => (
             <div key={index} className="relative group">
@@ -72,7 +69,6 @@ export default function HowItWorks() {
                   step.highlight ? "border-blue-200 bg-blue-50/30" : "border-slate-100"
                 }`}
               >
-                {/* Icon + Step number */}
                 <div className="flex items-start justify-between mb-6">
                   <div
                     className={`w-11 h-11 rounded-xl flex items-center justify-center shadow-md transition-shadow group-hover:shadow-lg ${
@@ -114,7 +110,6 @@ export default function HowItWorks() {
           ))}
         </div>
 
-        {/* CTA */}
         <div className="mt-14 text-center">
           <Link
             href="/search"

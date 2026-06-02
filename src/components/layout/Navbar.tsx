@@ -152,7 +152,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu — dropdown panel */}
+      {/* Mobile menu */}
       {mobileOpen && (
         <div
           className="md:hidden bg-white border-t border-slate-100"
@@ -162,7 +162,6 @@ export default function Navbar() {
             paddingBottom: "max(16px,env(safe-area-inset-bottom))",
           }}
         >
-          {/* Nav links */}
           <nav className="pt-2 pb-3">
             {navLinks.map((link) => (
               <Link
@@ -186,10 +185,8 @@ export default function Navbar() {
             )}
           </nav>
 
-          {/* Divider */}
           <div className="h-px bg-slate-100 mx-1 mb-3" />
 
-          {/* Auth section */}
           {user ? (
             <div className="space-y-1">
               <div className="flex items-center gap-3 px-3 py-2 mb-1">

@@ -25,7 +25,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-gray-100 flex flex-col sm:flex-row justify-between gap-3">
-          <p className="text-xs text-gray-400">© {new Date().getFullYear()} HomeOfferDirect.org. All rights reserved.</p>
+          <p className="text-xs text-gray-400">&copy; {new Date().getFullYear()} HomeOfferDirect.org. All rights reserved.</p>
           <p className="text-xs text-gray-400 max-w-sm">
             Not a law firm. Documents are for informational use. Always consult a licensed real estate attorney before submitting an offer.
           </p>

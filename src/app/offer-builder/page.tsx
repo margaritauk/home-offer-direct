@@ -1,273 +1,169 @@
 "use client";
-
 import { useState } from "react";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Sparkles,
-  CheckCircle,
-  Info,
-  AlertCircle,
-  Home,
-  DollarSign,
-  Calendar,
-  Shield,
-  FileText,
-  Send,
-  TrendingUp,
-  ChevronDown,
-  Lock,
-  Download,
-} from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home } from "lucide-react";
 
-const STEPS = [
-  { id: 1, label: "Property", icon: Home },
-  { id: 2, label: "Offer Price", icon: DollarSign },
-  { id: 3, label: "Financing", icon: TrendingUp },
-  { id: 4, label: "Timeline", icon: Calendar },
-  { id: 5, label: "Contingencies", icon: Shield },
-  { id: 6, label: "Terms", icon: FileText },
-  { id: 7, label: "Review", icon: CheckCircle },
-  { id: 8, label: "Submit", icon: Send },
+/* ─────────────────────────────────────────────────
+   WORKFLOW DEFINITION
+   One question per screen, real estate order
+───────────────────────────────────────────────── */
+const SECTIONS = [
+  { id:"setup",    label:"Setup",          steps:[0,1,2] },
+  { id:"property", label:"Your Property",  steps:[3] },
+  { id:"price",    label:"Offer Price",    steps:[4] },
+  { id:"financing",label:"Financing",      steps:[5,6,7] },
+  { id:"timeline", label:"Timeline",       steps:[8,9] },
+  { id:"protect",  label:"Contingencies",  steps:[10,11,12] },
+  { id:"terms",    label:"Extra Terms",    steps:[13,14] },
+  { id:"review",   label:"Review & Send",  steps:[15,16] },
 ];
+const TOTAL = 17;
 
-const property = {
-  address: "2847 N Clark St",
-  city: "Chicago",
-  state: "IL",
-  zip: "60657",
-  price: 485000,
-  beds: 3,
-  baths: 2,
-  sqft: 1850,
-  listingAgent: "Sarah Johnson",
-  brokerage: "Coldwell Banker",
-  dom: 12,
+type D = {
+  buyerType:string; state:string; firstTime:boolean;
+  propertyConfirmed:boolean;
+  offerPrice:number;
+  financeType:string; downPct:number; preApproved:boolean;
+  closingDays:number; earnestPct:number;
+  inspectionContingency:boolean; inspectionDays:number;
+  appraisalContingency:boolean;
+  financingContingency:boolean; financingDays:number;
+  escalation:boolean; escIncrement:number; escMax:number;
+  sellerCredits:number;
+  personalLetter:boolean;
 };
 
-export default function OfferBuilderPage() {
-  const [step, setStep] = useState(1);
-  const [offerData, setOfferData] = useState({
-    offerPrice: 492000,
-    financeType: "conventional",
-    downPayment: 20,
-    loanAmount: 0,
-    preApproved: true,
-    closingDate: "",
-    possessionDate: "closing",
-    earnestMoney: 9840,
-    inspectionContingency: true,
-    inspectionDays: 10,
-    appraisalContingency: true,
-    financingContingency: true,
-    financingDays: 21,
-    saleContingency: false,
-    escalationClause: false,
-    escalationIncrement: 2500,
-    escalationMax: 510000,
-    sellerCredits: 0,
-    includedItems: [] as string[],
-    repairRequests: "",
-    attorneyReviewDays: 5,
-    closingCostCredit: 0,
-    personalLetter: false,
-    additionalTerms: "",
+const PROPERTY = { address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657",
+  price:485000, beds:3, baths:2, sqft:1850, dom:12, agent:"Sarah Johnson",
+  brokerage:"Coldwell Banker", img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop" };
+
+const fmt = (n:number) => "$"+n.toLocaleString();
+
+export default function OfferBuilder() {
+  const [step, setStep] = useState(0);
+  const [showHelper, setShowHelper] = useState(false);
+  const [d, setD] = useState<D>({
+    buyerType:"first", state:"IL", firstTime:true,
+    propertyConfirmed:true,
+    offerPrice:492000,
+    financeType:"conventional", downPct:20, preApproved:true,
+    closingDays:30, earnestPct:2,
+    inspectionContingency:true, inspectionDays:10,
+    appraisalContingency:true,
+    financingContingency:true, financingDays:21,
+    escalation:false, escIncrement:2500, escMax:510000,
+    sellerCredits:0,
+    personalLetter:false,
   });
-  const [aiExpanded, setAiExpanded] = useState(true);
-  const [strengthScore, setStrengthScore] = useState(82);
 
-  const updateOffer = (key: string, value: unknown) => {
-    setOfferData((prev) => ({ ...prev, [key]: value }));
-    const scores: Record<string, number> = {
-      offerPrice: value && (value as number) >= 490000 ? 88 : 75,
-      inspectionContingency: value ? 80 : 90,
-      escalationClause: value ? 92 : 80,
-    };
-    if (key in scores) setStrengthScore(scores[key]);
-  };
+  const set = <K extends keyof D>(k:K, v:D[K]) => setD(p=>({...p,[k]:v}));
+  const pct = Math.round((step/(TOTAL-1))*100);
+  const activeSection = SECTIONS.find(s => s.steps.includes(step));
 
-  const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+  const next = () => { setStep(s=>Math.min(TOTAL-1,s+1)); setShowHelper(false); };
+  const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Top bar */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200/60">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-14">
-            <Link href="/search" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              Back to Search
-            </Link>
-
-            <div className="flex items-center gap-2">
-              <Home className="w-4 h-4 text-blue-500" />
-              <span className="text-sm font-medium text-slate-700">HomeOffer</span>
-              <span className="text-sm font-bold text-blue-600">Direct</span>
+    <div style={{minHeight:"100vh",background:"var(--gray-50)"}}>
+      {/* ── Top bar ── */}
+      <div style={{position:"fixed",top:0,left:0,right:0,zIndex:50,background:"#fff",borderBottom:"1px solid var(--gray-200)",paddingTop:"env(safe-area-inset-top)"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
+          <Link href="/" style={{display:"flex",alignItems:"center",gap:8,textDecoration:"none"}}>
+            <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#2563eb,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <Home style={{width:14,height:14,color:"#fff"}}/>
             </div>
-
-            <div className="flex items-center gap-3">
-              {/* Offer strength */}
-              <div className="hidden sm:flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-1.5">
-                <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all"
-                    style={{ width: `${strengthScore}%` }}
-                  />
-                </div>
-                <span className="text-xs font-semibold text-emerald-600">{strengthScore}% Strong</span>
-              </div>
-              <button className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-700">
-                <Lock className="w-3 h-3" />
-                Auto-saved
-              </button>
+            <span style={{fontWeight:700,color:"var(--gray-900)",fontSize:15}}>HomeOffer<span style={{color:"var(--blue)"}}>Direct</span></span>
+          </Link>
+          <div className="hidden sm:block" style={{flex:1,maxWidth:360,margin:"0 24px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--gray-500)",marginBottom:6}}>
+              <span style={{fontWeight:600,color:"var(--blue)"}}>{activeSection?.label}</span>
+              <span>{pct}% complete</span>
+            </div>
+            <div style={{height:4,background:"var(--gray-100)",borderRadius:4,overflow:"hidden"}}>
+              <div style={{height:4,width:`${pct}%`,background:"linear-gradient(90deg,#2563eb,#7c3aed)",borderRadius:4,transition:"width .4s ease"}}/>
             </div>
           </div>
-
-          {/* Progress bar */}
-          <div className="w-full h-1 bg-slate-100">
-            <div
-              className="h-full gradient-bg transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <Link href="/search" style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"var(--gray-500)",textDecoration:"none"}}>
+            <ArrowLeft style={{width:14,height:14}}/> Exit
+          </Link>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-20 pb-24">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-          {/* Left: Steps sidebar */}
-          <div className="lg:col-span-1">
-            {/* Property card */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 mb-4">
-              <div className="bg-slate-100 rounded-xl h-32 mb-3 overflow-hidden">
-                <div
-                  className="w-full h-full bg-cover bg-center"
-                  style={{ backgroundImage: "url(https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400)" }}
-                />
-              </div>
-              <p className="font-semibold text-slate-900 text-sm">{property.address}</p>
-              <p className="text-xs text-slate-500">{property.city}, {property.state} {property.zip}</p>
-              <p className="text-xl font-black text-slate-900 mt-2">{formatCurrency(property.price)}</p>
-              <p className="text-xs text-slate-500">{property.beds}bd · {property.baths}ba · {property.sqft.toLocaleString()} sqft</p>
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-xs text-slate-500">Listed by <span className="font-medium text-slate-700">{property.listingAgent}</span></p>
-                <p className="text-xs text-slate-400">{property.brokerage}</p>
-              </div>
-            </div>
+      {/* Mobile progress bar — below the top bar, sm and below only */}
+      <div className="sm:hidden fixed left-0 right-0 z-40 bg-white border-b border-gray-100 px-4 pb-2" style={{top:"calc(56px + env(safe-area-inset-top))"}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--gray-500)",marginBottom:4}}>
+          <span style={{fontWeight:600,color:"var(--blue)"}}>{activeSection?.label}</span>
+          <span>{pct}% complete</span>
+        </div>
+        <div style={{height:3,background:"var(--gray-100)",borderRadius:4,overflow:"hidden"}}>
+          <div style={{height:3,width:`${pct}%`,background:"linear-gradient(90deg,#2563eb,#7c3aed)",borderRadius:4,transition:"width .4s ease"}}/>
+        </div>
+      </div>
 
-            {/* Steps list */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 px-1">Progress</p>
-              <div className="space-y-1">
-                {STEPS.map((s) => {
-                  const Icon = s.icon;
-                  const isComplete = step > s.id;
-                  const isCurrent = step === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => step > s.id && setStep(s.id)}
-                      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all ${
-                        isCurrent
-                          ? "gradient-bg text-white font-semibold"
-                          : isComplete
-                          ? "text-emerald-700 bg-emerald-50 hover:bg-emerald-100 cursor-pointer font-medium"
-                          : "text-slate-400 cursor-not-allowed"
-                      }`}
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        isCurrent ? "bg-white/20" : isComplete ? "bg-emerald-200" : "bg-slate-100"
-                      }`}>
-                        {isComplete ? (
-                          <CheckCircle className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <Icon className={`w-3.5 h-3.5 ${isCurrent ? "text-white" : "text-slate-400"}`} />
-                        )}
-                      </div>
-                      <span>{s.label}</span>
-                      {isCurrent && (
-                        <span className="ml-auto text-xs bg-white/20 px-1.5 py-0.5 rounded">
-                          Now
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* ── Layout ── */}
+      <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start" style={{maxWidth:1100,margin:"0 auto",paddingLeft:16,paddingRight:16,paddingBottom:80,paddingTop:"max(116px, calc(56px + env(safe-area-inset-top) + 36px))"}}>
+
+        {/* Left sidebar — hidden on mobile via inline style trick */}
+        <div style={{position:"sticky",top:80}} className="hidden md:block">
+          <div className="card" style={{padding:"12px 8px"}}>
+            {SECTIONS.map(sec => {
+              const done = sec.steps.every(i=>i<step);
+              const active = sec.steps.includes(step);
+              return (
+                <div key={sec.id}
+                  className={`step-sidebar-item ${done?"done":""} ${active?"active":""}`}
+                  style={{cursor: done?"pointer":"default"}}
+                  onClick={()=>done&&setStep(sec.steps[0])}>
+                  <div style={{width:18,height:18,borderRadius:"50%",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",
+                    background: done?"#d1fae5": active?"var(--blue)":"var(--gray-100)",
+                    color: done?"var(--green)": active?"#fff":"var(--gray-300)"}}>
+                    {done
+                      ? <CheckCircle style={{width:11,height:11}}/>
+                      : <span style={{fontSize:9,fontWeight:700}}>{SECTIONS.indexOf(sec)+1}</span>
+                    }
+                  </div>
+                  {sec.label}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Right: Step content */}
-          <div className="lg:col-span-2">
-            {/* AI Advisor */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100 mb-6">
-              <button
-                className="flex items-center justify-between w-full px-5 py-4"
-                onClick={() => setAiExpanded(!aiExpanded)}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 gradient-bg rounded-lg flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-white" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold text-slate-900">AI Advisor</p>
-                    <p className="text-xs text-slate-500">Personalized guidance for this step</p>
-                  </div>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${aiExpanded ? "rotate-180" : ""}`} />
-              </button>
-              {aiExpanded && (
-                <div className="px-5 pb-4 text-sm text-slate-700 leading-relaxed border-t border-blue-100 pt-4">
-                  {getAiAdvice(step, offerData, property)}
-                </div>
-              )}
+          {/* Property mini card */}
+          <div className="card" style={{marginTop:12,overflow:"hidden"}}>
+            <div style={{height:80,backgroundImage:`url(${PROPERTY.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
+            <div style={{padding:"10px 12px"}}>
+              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-900)"}}>{PROPERTY.address}</p>
+              <p style={{fontSize:11,color:"var(--gray-500)"}}>{PROPERTY.city}, {PROPERTY.state}</p>
+              <p style={{fontSize:15,fontWeight:700,color:"var(--gray-900)",marginTop:4}}>{fmt(PROPERTY.price)}</p>
             </div>
+          </div>
+        </div>
 
-            {/* Step content */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 sm:p-8">
-              <StepContent
-                step={step}
-                offerData={offerData}
-                updateOffer={updateOffer}
-                property={property}
-              />
-            </div>
+        {/* ── Main content ── */}
+        <div style={{maxWidth:560}}>
+          <div key={step} className="fade-up">
+            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)}/>
+          </div>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between mt-6">
-              <button
-                onClick={() => setStep((s) => Math.max(1, s - 1))}
-                disabled={step === 1}
-                className="flex items-center gap-2 px-6 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </button>
+          {/* Nav buttons */}
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:32,paddingTop:24,borderTop:"1px solid var(--gray-200)"}}>
+            <button onClick={back} disabled={step===0}
+              style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",background:"transparent",border:"1.5px solid var(--gray-200)",borderRadius:10,fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:step===0?"not-allowed":"pointer",opacity:step===0?.4:1}}>
+              <ArrowLeft style={{width:15,height:15}}/> Back
+            </button>
 
-              <div className="text-sm text-slate-500">
-                Step {step} of {STEPS.length}
-              </div>
+            <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
 
-              {step < STEPS.length ? (
-                <button
-                  onClick={() => setStep((s) => Math.min(STEPS.length, s + 1))}
-                  className="flex items-center gap-2 gradient-bg text-white font-semibold px-8 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm"
-                >
-                  Continue
-                  <ArrowRight className="w-4 h-4" />
+            {step < TOTAL-1
+              ? <button onClick={next}
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                  Continue <ArrowRight style={{width:15,height:15}}/>
                 </button>
-              ) : (
-                <Link
-                  href="/pricing"
-                  className="flex items-center gap-2 gradient-bg text-white font-semibold px-8 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  Generate Offer
+              : <Link href="/pricing"
+                  style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",borderRadius:10,fontSize:14,fontWeight:600,textDecoration:"none"}}>
+                  Get my offer package <ArrowRight style={{width:15,height:15}}/>
                 </Link>
-              )}
-            </div>
+            }
           </div>
         </div>
       </div>
@@ -275,781 +171,570 @@ export default function OfferBuilderPage() {
   );
 }
 
-function getAiAdvice(
-  step: number,
-  offerData: Record<string, unknown>,
-  property: { price: number; dom: number; state: string }
-): React.ReactNode {
-  const adviceMap: Record<number, React.ReactNode> = {
-    1: (
-      <p>
-        I found this property at <strong>{formatCurrency(property.price)}</strong>. It&apos;s been on the
-        market for <strong>{property.dom} days</strong>. In Lincoln Park, similar homes are selling
-        in 8-14 days at an average of 101% of list price. This suggests the market is{" "}
-        <strong>competitive but not frenzied</strong> — giving you some room to negotiate.
-      </p>
-    ),
-    2: (
-      <p>
-        Based on recent comparable sales in this ZIP code, I recommend offering between{" "}
-        <strong>{formatCurrency(490000)}</strong> and <strong>{formatCurrency(498000)}</strong>. At{" "}
-        {property.dom} days on market, the seller may accept slightly under asking.
-        Starting at <strong>{formatCurrency(492000)}</strong> (1.4% above list) should be
-        competitive while leaving room if there are other offers.
-      </p>
-    ),
-    3: (
-      <p>
-        Getting <strong>pre-approved</strong> (not just pre-qualified) strengthens your offer
-        significantly. Sellers prefer conventional financing over FHA/VA when possible, as it
-        typically closes faster. If you can do <strong>20%+ down</strong>, mention it prominently
-        — it signals financial strength and eliminates PMI.
-      </p>
-    ),
-    4: (
-      <p>
-        A <strong>30-45 day closing</strong> is standard in Illinois. If the seller needs
-        flexibility, offering a <strong>flexible possession date</strong> (like letting them stay
-        up to 7 days after closing) can make your offer stand out without costing you money.
-      </p>
-    ),
-    5: (
-      <p>
-        I recommend keeping the <strong>inspection contingency</strong> — it protects you from
-        costly surprises. In this market, waiving inspections is risky. However, you can shorten
-        the period to <strong>7-10 days</strong> to show good faith. The{" "}
-        <strong>appraisal contingency</strong> protects you if the home doesn&apos;t appraise — important
-        when offering above asking price.
-      </p>
-    ),
-    6: (
-      <p>
-        Consider adding an <strong>escalation clause</strong> if you expect multiple offers. This
-        automatically increases your offer by increments up to your max — without revealing your
-        true ceiling upfront. Also consider a <strong>personal letter</strong> to the sellers;
-        in Illinois, this can sometimes tip a decision in your favor.
-      </p>
-    ),
-    7: (
-      <p>
-        Your offer looks <strong>strong</strong>! Review each section carefully before generating
-        your documents. Make sure your earnest money amount is correct — it will need to be
-        deposited within 24-48 hours of acceptance. Your documents will be formatted to{" "}
-        <strong>Illinois standards</strong> using the CAR-approved purchase contract.
-      </p>
-    ),
-    8: (
-      <p>
-        Your offer package is ready! You can <strong>download a PDF</strong> to deliver yourself,
-        or use our <strong>direct email delivery</strong> to send it to Sarah Johnson at Coldwell
-        Banker with a professional cover letter. I&apos;ll also provide suggested follow-up timing and
-        negotiation scripts if needed.
-      </p>
-    ),
-  };
-  return adviceMap[step] || <p>I&apos;m here to help with any questions about this step.</p>;
+/* ─────────────────────────────────────────────────
+   INDIVIDUAL STEP COMPONENTS
+───────────────────────────────────────────────── */
+type SetFn = <K extends keyof D>(k:K,v:D[K])=>void;
+
+function Q({ title, subtitle, helper, children, showHelper, toggleHelper }:
+  { title:string; subtitle?:string; helper?:string; children:React.ReactNode; showHelper?:boolean; toggleHelper?:()=>void }) {
+  return (
+    <div>
+      <h1 style={{fontSize:26,fontWeight:700,color:"var(--gray-900)",lineHeight:1.25,marginBottom:subtitle?8:24}}>{title}</h1>
+      {subtitle && <p style={{fontSize:15,color:"var(--gray-500)",marginBottom:24,lineHeight:1.6}}>{subtitle}</p>}
+      {helper && toggleHelper && (
+        <div style={{marginBottom:20}}>
+          <button onClick={toggleHelper}
+            style={{display:"flex",alignItems:"center",gap:6,fontSize:13,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:0}}>
+            <Info style={{width:14,height:14}}/>
+            {showHelper ? "Hide explanation" : "What does this mean?"}
+            {showHelper ? <ChevronUp style={{width:12,height:12}}/> : <ChevronDown style={{width:12,height:12}}/>}
+          </button>
+          {showHelper && (
+            <div className="helper-box" style={{marginTop:10}}>
+              <p style={{fontSize:13,color:"var(--gray-700)",lineHeight:1.6}}>{helper}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {children}
+    </div>
+  );
 }
 
-function StepContent({
-  step,
-  offerData,
-  updateOffer,
-  property,
-}: {
-  step: number;
-  offerData: Record<string, unknown>;
-  updateOffer: (key: string, value: unknown) => void;
-  property: { address: string; city: string; state: string; zip: string; price: number; beds: number; baths: number; sqft: number; listingAgent: string; brokerage: string; dom: number };
-}) {
-  if (step === 1) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Confirm Property Details</h2>
-        <p className="text-slate-500 mb-8">Review the property you want to make an offer on.</p>
+function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
+  { label:string; desc?:string; icon?:string; selected:boolean; onClick:()=>void; badge?:string; warn?:boolean }) {
+  return (
+    <button className={`option-card ${selected?"selected":""}`} onClick={onClick}
+      style={{marginBottom:10, borderColor: warn&&!selected?"var(--amber)":undefined}}>
+      {icon && <span style={{fontSize:24,flexShrink:0}}>{icon}</span>}
+      <div style={{flex:1}}>
+        <div style={{display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:15,fontWeight:600,color:"var(--gray-900)"}}>{label}</span>
+          {badge && <span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:99,background:selected?"#dbeafe":"var(--gray-100)",color:selected?"var(--blue)":"var(--gray-500)"}}>{badge}</span>}
+          {warn && !selected && <AlertTriangle style={{width:14,height:14,color:"var(--amber)"}}/>}
+        </div>
+        {desc && <p style={{fontSize:13,color:"var(--gray-500)",marginTop:2,lineHeight:1.5}}>{desc}</p>}
+      </div>
+      <div className="check">
+        {selected && <CheckCircle style={{width:13,height:13,color:"#fff"}}/>}
+      </div>
+    </button>
+  );
+}
 
-        <div className="space-y-4">
+function StepView({ step, d, set, showHelper, toggleHelper }:
+  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void }) {
+
+  // ── Step 0: Buyer type ──────────────────────────────────────────────
+  if (step===0) return (
+    <Q title="What best describes you?" subtitle="We'll personalize your guidance based on your experience.">
+      {[
+        {v:"first", icon:"🏡", label:"First-time buyer", desc:"I've never purchased a home before"},
+        {v:"experienced", icon:"🔑", label:"I've bought before", desc:"I've been through the process at least once"},
+        {v:"investor", icon:"📈", label:"Real estate investor", desc:"I buy properties regularly"},
+      ].map(o=>(
+        <OptionCard key={o.v} label={o.label} desc={o.desc} icon={o.icon}
+          selected={d.buyerType===o.v} onClick={()=>set("buyerType",o.v)}/>
+      ))}
+    </Q>
+  );
+
+  // ── Step 1: State ───────────────────────────────────────────────────
+  if (step===1) return (
+    <Q title="Which state is the property in?"
+      subtitle="Each state uses different legal forms. We'll automatically load the correct ones.">
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+        {[
+          {v:"IL",label:"Illinois 🏙️",note:"CAR forms"},
+          {v:"TX",label:"Texas 🌵",note:"TREC forms"},
+          {v:"NY",label:"New York 🗽",note:"NYSBA forms"},
+          {v:"CA",label:"California ☀️",note:"CAR forms"},
+          {v:"FL",label:"Florida 🌴",note:"FAR forms"},
+        ].map(s=>(
+          <button key={s.v} onClick={()=>set("state",s.v)}
+            className={`option-card ${d.state===s.v?"selected":""}`}
+            style={{flexDirection:"column",alignItems:"flex-start",gap:4}}>
+            <span style={{fontSize:14,fontWeight:600,color:"var(--gray-900)"}}>{s.label}</span>
+            <span style={{fontSize:11,color:"var(--gray-500)"}}>{s.note}</span>
+            <div className="check" style={{position:"absolute" as const,top:12,right:12}}>
+              {d.state===s.v&&<CheckCircle style={{width:13,height:13,color:"#fff"}}/>}
+            </div>
+          </button>
+        ))}
+      </div>
+    </Q>
+  );
+
+  // ── Step 2: Pre-approval ────────────────────────────────────────────
+  if (step===2) return (
+    <Q title="Do you have a mortgage pre-approval?"
+      subtitle="This is one of the most important things sellers look at."
+      helper="A pre-approval letter from a lender shows the seller you've already been approved for a loan up to a certain amount. It's different from a pre-qualification — sellers take pre-approvals much more seriously. If you're paying all cash, select that option instead."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <OptionCard icon="✅" label="Yes, I'm pre-approved"
+        desc="I have a letter from my lender ready to attach."
+        badge="Strongest position"
+        selected={d.financeType!=="cash" && d.preApproved}
+        onClick={()=>{set("preApproved",true); set("financeType","conventional");}}/>
+      <OptionCard icon="💵" label="I'm paying all cash"
+        desc="No mortgage needed. This is the strongest possible offer."
+        badge="Most competitive"
+        selected={d.financeType==="cash"}
+        onClick={()=>{set("financeType","cash"); set("preApproved",false);}}/>
+      <OptionCard icon="📄" label="No pre-approval yet"
+        desc="I haven't started the mortgage process."
+        warn={true}
+        selected={d.financeType!=="cash" && !d.preApproved}
+        onClick={()=>{set("preApproved",false); set("financeType","conventional");}}/>
+      {d.financeType!=="cash" && !d.preApproved && (
+        <div className="warn-box" style={{marginTop:8}}>
+          <p style={{fontSize:13,color:"#92400e"}}>⚠️ <strong>Tip:</strong> Sellers often won't consider offers without pre-approval. We recommend getting one before submitting — it takes 24–48 hours online.</p>
+        </div>
+      )}
+    </Q>
+  );
+
+  // ── Step 3: Property confirm ────────────────────────────────────────
+  if (step===3) return (
+    <Q title="Confirm the property" subtitle="Here's the home you're making an offer on.">
+      <div className="card" style={{overflow:"hidden",marginBottom:16}}>
+        <div style={{height:180,backgroundImage:`url(${PROPERTY.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
+        <div style={{padding:"16px 20px"}}>
           {[
-            { label: "Property Address", value: `${property.address}, ${property.city}, ${property.state} ${property.zip}` },
-            { label: "Asking Price", value: formatCurrency(property.price) },
-            { label: "Bedrooms / Bathrooms", value: `${property.beds} bd / ${property.baths} ba` },
-            { label: "Square Footage", value: `${property.sqft.toLocaleString()} sqft` },
-            { label: "State", value: "Illinois (IL)" },
-            { label: "Listing Agent", value: `${property.listingAgent}, ${property.brokerage}` },
-            { label: "Days on Market", value: `${property.dom} days` },
-          ].map(({ label, value }) => (
-            <div key={label} className="flex items-start justify-between py-3 border-b border-slate-100">
-              <span className="text-sm text-slate-500">{label}</span>
-              <span className="text-sm font-semibold text-slate-900 text-right max-w-xs">{value}</span>
+            ["Address",`${PROPERTY.address}, ${PROPERTY.city}, ${PROPERTY.state} ${PROPERTY.zip}`],
+            ["List price", fmt(PROPERTY.price)],
+            ["Beds / Baths", `${PROPERTY.beds} bd · ${PROPERTY.baths} ba · ${PROPERTY.sqft.toLocaleString()} sqft`],
+            ["Days on market", `${PROPERTY.dom} days`],
+            ["Listing agent", `${PROPERTY.agent} · ${PROPERTY.brokerage}`],
+            ["State forms", "Illinois Residential Purchase & Sale Agreement"],
+          ].map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
+              <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)",textAlign:"right",maxWidth:"60%"}}>{v}</span>
             </div>
           ))}
         </div>
+      </div>
+      <div className="good-box">
+        <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>
+          ✓ This home has been on the market for {PROPERTY.dom} days. Comparable homes in this ZIP sold for 101–103% of asking price in the last 90 days.
+        </p>
+      </div>
+    </Q>
+  );
 
-        <div className="mt-6 bg-amber-50 rounded-xl p-4 flex gap-3">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Illinois State Forms</p>
-            <p className="text-sm text-amber-700 mt-0.5">
-              Your offer will use the Illinois REALTORS® Residential Real Estate Purchase and Sale
-              Contract, the standard form recognized by all agents in IL.
+  // ── Step 4: Offer price ─────────────────────────────────────────────
+  if (step===4) return (
+    <Q title="How much do you want to offer?"
+      subtitle={`The asking price is ${fmt(PROPERTY.price)}. Here's what the market data suggests.`}
+      helper="Your offer price is the amount you're willing to pay for the home. Going above asking can win bidding wars but you don't want to overpay. Going below asking may save money but could lose the deal. The AI recommendation is based on recent nearby sales, days on market, and current inventory levels."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+
+      {/* AI recommendation banner */}
+      <div style={{background:"var(--blue-light)",border:"1.5px solid #bfdbfe",borderRadius:12,padding:"14px 18px",marginBottom:20}}>
+        <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+          <span style={{fontSize:14}}>🤖</span>
+          <span style={{fontSize:13,fontWeight:600,color:"var(--blue)"}}>AI Recommendation for Chicago · Lincoln Park</span>
+        </div>
+        <p style={{fontSize:13,color:"var(--gray-700)",lineHeight:1.6}}>
+          Based on 14 recent sales, homes here sell for <strong>1–3% above asking</strong> in 9 days average. I recommend <strong>{fmt(492000)}</strong> — competitive without overbidding.
+        </p>
+      </div>
+
+      {/* Quick picks */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        {[
+          {p:PROPERTY.price-15000, label:"$15K below asking", note:"Low risk of winning"},
+          {p:PROPERTY.price,       label:"At asking price",   note:"Moderate"},
+          {p:492000,               label:"$7K above asking",  note:"AI recommended", ai:true},
+          {p:PROPERTY.price+20000, label:"$20K above asking", note:"Very competitive"},
+        ].map(o=>(
+          <button key={o.p} onClick={()=>set("offerPrice",o.p)}
+            style={{padding:"14px 16px",border:`1.5px solid ${d.offerPrice===o.p?"var(--blue)":"var(--gray-200)"}`,borderRadius:10,
+              background:d.offerPrice===o.p?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}}>
+            <div style={{fontSize:15,fontWeight:700,color:d.offerPrice===o.p?"var(--blue)":"var(--gray-900)"}}>{fmt(o.p)}</div>
+            <div style={{fontSize:11,color:"var(--gray-500)",marginTop:2}}>{o.label}</div>
+            {o.ai && <div style={{fontSize:11,color:"var(--blue)",fontWeight:600,marginTop:2}}>✦ AI pick</div>}
+          </button>
+        ))}
+      </div>
+
+      {/* Custom input */}
+      <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Or enter your own amount</label>
+      <div style={{position:"relative"}}>
+        <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"var(--gray-500)",fontSize:15}}>$</span>
+        <input type="number" value={d.offerPrice} onChange={e=>set("offerPrice",+e.target.value)}
+          className="input-field" style={{paddingLeft:28}}/>
+      </div>
+
+      {/* Strength bar */}
+      <div style={{marginTop:16,padding:"14px 16px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)"}}>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8}}>
+          <span style={{color:"var(--gray-600)"}}>Offer strength vs. asking price</span>
+          <span style={{fontWeight:700,color:d.offerPrice>=PROPERTY.price?"var(--green)":"var(--amber)"}}>
+            {d.offerPrice>=PROPERTY.price
+              ? `+${fmt(d.offerPrice-PROPERTY.price)} above (${((d.offerPrice/PROPERTY.price-1)*100).toFixed(1)}%)`
+              : `-${fmt(PROPERTY.price-d.offerPrice)} below`}
+          </span>
+        </div>
+        <div style={{height:6,background:"var(--gray-200)",borderRadius:3,overflow:"hidden"}}>
+          <div style={{height:6,background:d.offerPrice>=PROPERTY.price?"var(--green)":"var(--amber)",
+            borderRadius:3,transition:"width .4s",
+            width:`${Math.min(100,Math.max(5,50+(d.offerPrice-PROPERTY.price)/PROPERTY.price*300))}%`}}/>
+        </div>
+      </div>
+    </Q>
+  );
+
+  // ── Step 5: Loan type ───────────────────────────────────────────────
+  if (step===5) return (
+    <Q title="What type of loan are you using?"
+      helper="Conventional loans are the most common and fastest to close. FHA loans allow lower down payments (3.5%) but take longer to close. VA loans are for veterans with great terms. All-cash offers close fastest and are strongest for the seller."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      {d.financeType==="cash"
+        ? (
+          <div className="good-box">
+            <p style={{fontSize:14,color:"#065f46",lineHeight:1.6}}>
+              💵 <strong>All-cash offer selected</strong> — this is the strongest type of offer. No financing contingency needed. We'll skip the loan questions.
             </p>
           </div>
+        )
+        : [
+          {v:"conventional", icon:"🏦", label:"Conventional loan", desc:"Most common. 30 or 15-year. Best for buyers with good credit.", badge:"Most common"},
+          {v:"fha",          icon:"🏛️", label:"FHA loan",          desc:"Government-backed. As low as 3.5% down. Takes slightly longer."},
+          {v:"va",           icon:"⭐", label:"VA loan",            desc:"Veterans only. No down payment required. Excellent terms.", badge:"Veterans only"},
+        ].map(o=>(
+          <OptionCard key={o.v} icon={o.icon} label={o.label} desc={o.desc} badge={o.badge}
+            selected={d.financeType===o.v} onClick={()=>set("financeType",o.v as D["financeType"])}/>
+        ))
+      }
+    </Q>
+  );
+
+  // ── Step 6: Down payment ────────────────────────────────────────────
+  if (step===6) {
+    if (d.financeType==="cash") return (
+      <Q title="Great — you're paying all cash" subtitle="We'll skip the down payment and financing questions.">
+        <div className="good-box">
+          <p style={{fontSize:14,color:"#065f46",lineHeight:1.6}}>✓ Cash offers typically close in 2–3 weeks instead of 30–45 days, and sellers often accept cash at a slight discount. You'll need to provide proof of funds with your offer.</p>
         </div>
-      </div>
+      </Q>
+    );
+    return (
+      <Q title="How much are you putting down?"
+        subtitle="A larger down payment signals financial strength to sellers."
+        helper="Your down payment is the percentage of the home price you pay upfront. The rest is covered by your mortgage. 20% down eliminates Private Mortgage Insurance (PMI), which can add $100–300/month to your payment."
+        showHelper={showHelper} toggleHelper={toggleHelper}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+          {[
+            {p:3,  note:d.financeType==="fha"?"FHA minimum":"Low — PMI required",warn:true},
+            {p:5,  note:"PMI required"},
+            {p:10, note:"PMI required"},
+            {p:20, note:"No PMI — ideal", best:true},
+            {p:25, note:"Strong position"},
+            {p:30, note:"Very strong"},
+          ].map(o=>(
+            <button key={o.p} onClick={()=>set("downPct",o.p)}
+              style={{padding:"14px 16px",border:`1.5px solid ${d.downPct===o.p?"var(--blue)":"var(--gray-200)"}`,
+                borderRadius:10,background:d.downPct===o.p?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}}>
+              <div style={{fontSize:16,fontWeight:700,color:d.downPct===o.p?"var(--blue)":"var(--gray-900)"}}>{o.p}%</div>
+              <div style={{fontSize:12,color:o.best?"var(--green)":o.warn?"var(--amber)":"var(--gray-500)",marginTop:2,fontWeight:o.best?600:400}}>{o.note}</div>
+              <div style={{fontSize:12,color:"var(--gray-500)",marginTop:1}}>{fmt(Math.round(d.offerPrice*o.p/100))}</div>
+            </button>
+          ))}
+        </div>
+        {d.downPct<20 && (
+          <div className="warn-box" style={{marginTop:12}}>
+            <p style={{fontSize:13,color:"#92400e"}}>⚠️ Below 20% down means you'll pay Private Mortgage Insurance (PMI) until you reach 20% equity. This adds roughly ${Math.round(d.offerPrice*0.005/12)}/month to your payment.</p>
+          </div>
+        )}
+      </Q>
     );
   }
 
-  if (step === 2) {
-    const prices = [property.price - 10000, property.price, property.price + 5000, property.price + 15000];
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">What&apos;s your offer price?</h2>
-        <p className="text-slate-500 mb-8">
-          Enter the amount you want to offer. List price is{" "}
-          <strong className="text-slate-700">{formatCurrency(property.price)}</strong>.
+  // ── Step 7: Earnest money ───────────────────────────────────────────
+  if (step===7) return (
+    <Q title="How much earnest money will you deposit?"
+      subtitle="This is a good-faith deposit that shows you're serious."
+      helper="Earnest money is a deposit you make when your offer is accepted. It's held in an escrow account and applied to your down payment at closing. If you back out for reasons not covered by contingencies, you may lose this money. In Illinois, 2% of the purchase price is standard."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+        {[1,2,3].map(p=>(
+          <button key={p} onClick={()=>set("earnestPct",p)}
+            style={{padding:"14px",border:`1.5px solid ${d.earnestPct===p?"var(--blue)":"var(--gray-200)"}`,
+              borderRadius:10,background:d.earnestPct===p?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"center",transition:"all .15s"}}>
+            <div style={{fontSize:18,fontWeight:700,color:d.earnestPct===p?"var(--blue)":"var(--gray-900)"}}>{p}%</div>
+            <div style={{fontSize:12,color:"var(--gray-500)",marginTop:2}}>{fmt(Math.round(d.offerPrice*p/100))}</div>
+            {p===2&&<div style={{fontSize:11,color:"var(--green)",fontWeight:600,marginTop:2}}>IL standard</div>}
+          </button>
+        ))}
+      </div>
+      <div className="helper-box">
+        <p style={{fontSize:13,color:".var(--gray-700)",lineHeight:1.6}}>
+          ℹ️ In Illinois, earnest money must be deposited within <strong>24–48 hours</strong> of offer acceptance. Make sure you have {fmt(Math.round(d.offerPrice*d.earnestPct/100))} readily available in your bank account.
         </p>
-
-        {/* Quick select */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-          {prices.map((price, i) => {
-            const diff = price - property.price;
-            const diffStr = diff === 0 ? "List price" : diff > 0 ? `+${formatCurrency(diff)}` : formatCurrency(diff);
-            const isSelected = (offerData.offerPrice as number) === price;
-            return (
-              <button
-                key={price}
-                onClick={() => updateOffer("offerPrice", price)}
-                className={`p-3 rounded-xl text-left border-2 transition-all ${
-                  isSelected ? "border-blue-500 bg-blue-50" : "border-slate-200 hover:border-blue-300"
-                }`}
-              >
-                <p className={`text-sm font-bold ${isSelected ? "text-blue-700" : "text-slate-900"}`}>
-                  {formatCurrency(price)}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">{diffStr}</p>
-                {i === 2 && (
-                  <span className="inline-block mt-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold">
-                    AI Pick
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Custom input */}
-        <div className="relative mb-6">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">$</span>
-          <input
-            type="number"
-            value={offerData.offerPrice as number}
-            onChange={(e) => updateOffer("offerPrice", Number(e.target.value))}
-            className="w-full pl-8 pr-4 py-4 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-900 focus:outline-none focus:border-blue-500 transition-all"
-          />
-        </div>
-
-        {/* Strength meter */}
-        <div className="bg-slate-50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-slate-700">Offer Competitiveness</span>
-            <span className={`text-sm font-bold ${(offerData.offerPrice as number) >= property.price ? "text-emerald-600" : "text-orange-500"}`}>
-              {(offerData.offerPrice as number) >= property.price ? "Strong ↑" : "Below Asking ↓"}
-            </span>
-          </div>
-          <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
-            <div
-              className="h-3 rounded-full transition-all duration-500"
-              style={{
-                width: `${Math.min(100, Math.max(10, ((offerData.offerPrice as number) / property.price - 0.9) * 1000))}%`,
-                background: (offerData.offerPrice as number) >= property.price
-                  ? "linear-gradient(to right, #34d399, #10b981)"
-                  : "linear-gradient(to right, #fbbf24, #f59e0b)",
-              }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-slate-400 mt-1">
-            <span>Low</span>
-            <span>Asking</span>
-            <span>Above Market</span>
-          </div>
-        </div>
       </div>
-    );
-  }
+    </Q>
+  );
 
-  if (step === 3) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Financing Details</h2>
-        <p className="text-slate-500 mb-8">Tell us how you plan to finance the purchase.</p>
+  // ── Step 8: Closing timeline ────────────────────────────────────────
+  if (step===8) return (
+    <Q title="When do you want to close?"
+      subtitle="The closing date is when you get the keys and the home becomes yours."
+      helper="The closing date is typically 30–45 days after offer acceptance. This gives time for inspections, appraisal, and your lender to finalize the loan. Sellers sometimes prefer faster or slower closings depending on their situation — offering flexibility can make your offer stand out."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
+        {[
+          {d:21, label:"21 days", note:"Fast — cash or very strong financing only"},
+          {d:30, label:"30 days", note:"Standard in most markets", best:true},
+          {d:45, label:"45 days", note:"Typical for FHA/VA loans"},
+          {d:60, label:"60 days", note:"Flexible — seller may prefer this"},
+        ].map(o=>(
+          <button key={o.d} onClick={()=>set("closingDays",o.d)}
+            style={{padding:"14px 16px",border:`1.5px solid ${d.closingDays===o.d?"var(--blue)":"var(--gray-200)"}`,
+              borderRadius:10,background:d.closingDays===o.d?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}}>
+            <div style={{fontSize:15,fontWeight:700,color:d.closingDays===o.d?"var(--blue)":"var(--gray-900)"}}>{o.label}</div>
+            <div style={{fontSize:12,color:o.best?"var(--green)":"var(--gray-500)",marginTop:3,fontWeight:o.best?600:400}}>{o.note}</div>
+          </button>
+        ))}
+      </div>
+      <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Or pick a specific date</label>
+      <input type="date" className="input-field"
+        min={new Date(Date.now()+15*86400000).toISOString().split("T")[0]}/>
+    </Q>
+  );
 
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">Loan Type</label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {[
-                { value: "conventional", label: "Conventional", desc: "Most common, fastest close" },
-                { value: "fha", label: "FHA", desc: "Low down payment (3.5%)" },
-                { value: "va", label: "VA Loan", desc: "Veterans, no down payment" },
-                { value: "cash", label: "All Cash", desc: "Strongest offer type" },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => updateOffer("financeType", option.value)}
-                  className={`p-4 rounded-xl border-2 text-left transition-all ${
-                    offerData.financeType === option.value
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-slate-200 hover:border-blue-300"
-                  }`}
-                >
-                  <p className={`text-sm font-bold ${offerData.financeType === option.value ? "text-blue-700" : "text-slate-900"}`}>
-                    {option.label}
-                  </p>
-                  <p className="text-xs text-slate-500 mt-1">{option.desc}</p>
-                  {option.value === "cash" && (
-                    <span className="inline-block mt-1 text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-semibold">
-                      Strongest
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
+  // ── Step 9: Inspection contingency ─────────────────────────────────
+  if (step===9) return (
+    <Q title="Do you want an inspection contingency?"
+      subtitle="This lets you back out or renegotiate if the home inspection finds serious problems."
+      helper="An inspection contingency gives you the right to hire a professional inspector to examine the home. If they find major issues, you can request repairs, ask for a price reduction, or walk away and get your earnest money back. Waiving this saves time but means you're buying 'as-is' — risky for older homes."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <OptionCard icon="🔍" label="Yes — include inspection contingency"
+        desc="I want 10 days to inspect the home. Most buyers choose this." badge="Recommended"
+        selected={d.inspectionContingency && d.inspectionDays===10}
+        onClick={()=>{set("inspectionContingency",true); set("inspectionDays",10);}}/>
+      <OptionCard icon="⚡" label="Yes — shorter 7-day inspection window"
+        desc="Shows urgency. Useful in very competitive markets."
+        selected={d.inspectionContingency && d.inspectionDays===7}
+        onClick={()=>{set("inspectionContingency",true); set("inspectionDays",7);}}/>
+      <OptionCard icon="🚫" label="No — waive the inspection contingency"
+        desc="Strongest offer — but you accept the home in its current condition."
+        warn={true}
+        selected={!d.inspectionContingency}
+        onClick={()=>set("inspectionContingency",false)}/>
+      {!d.inspectionContingency && (
+        <div className="warn-box" style={{marginTop:8}}>
+          <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ <strong>High risk:</strong> Without an inspection, you could be responsible for costly hidden defects — HVAC failures, foundation issues, roof damage, etc. We strongly advise against this unless you're very familiar with the property.</p>
+        </div>
+      )}
+    </Q>
+  );
 
-          {offerData.financeType !== "cash" && (
-            <>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Down Payment Percentage
-                </label>
-                <div className="flex gap-3 flex-wrap">
-                  {[3.5, 5, 10, 20, 25].map((pct) => (
-                    <button
-                      key={pct}
-                      onClick={() => updateOffer("downPayment", pct)}
-                      className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-                        offerData.downPayment === pct
-                          ? "border-blue-500 bg-blue-50 text-blue-700"
-                          : "border-slate-200 text-slate-600 hover:border-blue-300"
-                      }`}
-                    >
-                      {pct}%
-                      {pct === 20 && <span className="block text-xs">Ideal</span>}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-sm text-slate-500 mt-2">
-                  Down payment amount: <strong className="text-slate-700">
-                    {formatCurrency((offerData.offerPrice as number) * ((offerData.downPayment as number) / 100))}
-                  </strong>
-                </p>
-              </div>
+  // ── Step 10: Appraisal contingency ─────────────────────────────────
+  if (step===10) return (
+    <Q title="Do you want an appraisal contingency?"
+      subtitle="This protects you if the bank says the home is worth less than your offer price."
+      helper="When you get a mortgage, your lender requires a professional appraisal. If the home appraises below your offer price, the lender won't loan you the full amount. An appraisal contingency lets you renegotiate or back out. Without it, you'd need to cover the gap in cash."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <OptionCard icon="📊" label="Yes — include appraisal contingency"
+        desc="I'm protected if the home appraises below my offer price." badge="Recommended"
+        selected={d.appraisalContingency}
+        onClick={()=>set("appraisalContingency",true)}/>
+      <OptionCard icon="💪" label="No — waive appraisal contingency"
+        desc="Stronger offer — but I must cover any gap between appraised value and offer price."
+        warn={true}
+        selected={!d.appraisalContingency}
+        onClick={()=>set("appraisalContingency",false)}/>
+      {!d.appraisalContingency && (
+        <div className="warn-box" style={{marginTop:8}}>
+          <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ You offered {fmt(d.offerPrice)} ({fmt(d.offerPrice-PROPERTY.price)} above asking). If the home appraises at asking price, you'd need an extra <strong>{fmt(d.offerPrice-PROPERTY.price)} in cash at closing</strong>.</p>
+        </div>
+      )}
+    </Q>
+  );
 
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
-                <input
-                  type="checkbox"
-                  id="preapproved"
-                  checked={offerData.preApproved as boolean}
-                  onChange={(e) => updateOffer("preApproved", e.target.checked)}
-                  className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                />
-                <div>
-                  <label htmlFor="preapproved" className="text-sm font-semibold text-slate-700 cursor-pointer">
-                    I have a pre-approval letter
-                  </label>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Attaching your pre-approval significantly strengthens your offer.
-                  </p>
-                </div>
-                <CheckCircle className={`w-5 h-5 ml-auto flex-shrink-0 ${offerData.preApproved ? "text-emerald-500" : "text-slate-300"}`} />
-              </div>
-            </>
-          )}
-
-          {offerData.financeType === "cash" && (
-            <div className="bg-emerald-50 rounded-xl p-4 flex gap-3">
-              <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">Cash offer — your strongest move</p>
-                <p className="text-sm text-emerald-700 mt-0.5">
-                  Cash offers close faster, eliminate financing risk, and sellers almost always
-                  prefer them. You&apos;ll need to provide proof of funds with your offer.
-                </p>
-              </div>
+  // ── Step 11: Financing contingency ─────────────────────────────────
+  if (step===11) return (
+    <Q title="Do you want a financing contingency?"
+      subtitle="This lets you walk away if your mortgage falls through."
+      helper="Even with a pre-approval, mortgages can fall through — your financial situation could change, the property might not qualify, or interest rates could move. A financing contingency means if you can't get your loan within the agreed period, you can back out and get your earnest money back."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      {d.financeType==="cash"
+        ? <div className="good-box"><p style={{fontSize:14,color:"#065f46",lineHeight:1.6}}>✓ Cash buyers don't need a financing contingency — you're not getting a mortgage. This is automatically skipped.</p></div>
+        : <>
+          <OptionCard icon="🛡️" label="Yes — include financing contingency"
+            desc="I'm protected if I can't get my mortgage approved within 21 days." badge="Recommended"
+            selected={d.financingContingency}
+            onClick={()=>set("financingContingency",true)}/>
+          <OptionCard icon="⚡" label="No — waive financing contingency"
+            desc="Stronger offer but I risk losing my earnest money if my loan is denied."
+            warn={true}
+            selected={!d.financingContingency}
+            onClick={()=>set("financingContingency",false)}/>
+          {!d.financingContingency && (
+            <div className="warn-box" style={{marginTop:8}}>
+              <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ If your mortgage is denied, you could lose your {fmt(Math.round(d.offerPrice*d.earnestPct/100))} earnest money deposit. Only waive this if you're extremely confident in your financing.</p>
             </div>
           )}
-        </div>
-      </div>
-    );
-  }
+        </>}
+    </Q>
+  );
 
-  if (step === 4) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Closing Timeline</h2>
-        <p className="text-slate-500 mb-8">When do you want to close on the property?</p>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Target Closing Date
-            </label>
-            <input
-              type="date"
-              value={offerData.closingDate as string}
-              onChange={(e) => updateOffer("closingDate", e.target.value)}
-              min={new Date(Date.now() + 20 * 86400000).toISOString().split("T")[0]}
-              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 transition-all"
-            />
-            <div className="flex gap-2 mt-3">
-              {[21, 30, 45, 60].map((days) => {
-                const date = new Date(Date.now() + days * 86400000);
-                const dateStr = date.toISOString().split("T")[0];
-                return (
-                  <button
-                    key={days}
-                    onClick={() => updateOffer("closingDate", dateStr)}
-                    className="text-xs px-3 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                  >
-                    {days} days
-                    {days === 30 && <span className="block text-blue-500">Typical</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-3">
-              Earnest Money Deposit
-            </label>
-            <div className="relative mb-3">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-              <input
-                type="number"
-                value={offerData.earnestMoney as number}
-                onChange={(e) => updateOffer("earnestMoney", Number(e.target.value))}
-                className="w-full pl-8 pr-4 py-3 border-2 border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500 transition-all"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 2, 3].map((pct) => (
-                <button
-                  key={pct}
-                  onClick={() => updateOffer("earnestMoney", Math.round((offerData.offerPrice as number) * (pct / 100)))}
-                  className="text-sm px-3 py-2 border border-slate-200 rounded-xl text-slate-600 hover:border-blue-300 hover:bg-blue-50 transition-all"
-                >
-                  {pct}% ({formatCurrency(Math.round((offerData.offerPrice as number) * (pct / 100)))})
-                  {pct === 2 && <span className="block text-xs text-blue-500">Standard in IL</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-blue-50 rounded-xl p-4 flex gap-3">
-            <Info className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+  // ── Step 12: Escalation clause ─────────────────────────────────────
+  if (step===12) return (
+    <Q title="Do you want an escalation clause?"
+      subtitle="If another buyer makes a higher offer, should yours automatically increase?"
+      helper="An escalation clause says: 'I'll beat any other legitimate offer by $X, up to a maximum of $Y.' For example, you might offer $492K and escalate in $2,500 increments up to $510K. This lets you stay competitive without revealing your maximum upfront. It only triggers if there's a real competing offer."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <OptionCard icon="📈" label="Yes — add an escalation clause"
+        desc="Automatically beat competing offers up to my maximum. Smart in competitive markets."
+        selected={d.escalation}
+        onClick={()=>set("escalation",true)}/>
+      <OptionCard icon="📋" label="No — my offer is firm"
+        desc="I'll submit my best price and not escalate."
+        selected={!d.escalation}
+        onClick={()=>set("escalation",false)}/>
+      {d.escalation && (
+        <div className="card-sm" style={{padding:"16px 20px",marginTop:12,border:"1.5px solid #bfdbfe"}}>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
             <div>
-              <p className="text-sm font-semibold text-blue-800">About Earnest Money</p>
-              <p className="text-sm text-blue-700 mt-0.5">
-                Earnest money is a good-faith deposit that shows you&apos;re serious. In Illinois,
-                2% is standard. It&apos;s held in escrow and applied to your down payment at closing
-                — or returned to you if the deal falls through under certain contingencies.
-              </p>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Beat competing offers by</label>
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--gray-400)",fontSize:13}}>$</span>
+                <input type="number" value={d.escIncrement} onChange={e=>set("escIncrement",+e.target.value)}
+                  className="input-field" style={{paddingLeft:24,fontSize:14}}/>
+              </div>
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Up to my maximum</label>
+              <div style={{position:"relative"}}>
+                <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--gray-400)",fontSize:13}}>$</span>
+                <input type="number" value={d.escMax} onChange={e=>set("escMax",+e.target.value)}
+                  className="input-field" style={{paddingLeft:24,fontSize:14}}/>
+              </div>
             </div>
           </div>
+          <p style={{fontSize:12,color:"var(--gray-500)",marginTop:10,lineHeight:1.5}}>
+            Your offer will automatically rise by {fmt(d.escIncrement)} increments to beat other offers, up to a max of {fmt(d.escMax)}.
+          </p>
         </div>
-      </div>
-    );
-  }
+      )}
+    </Q>
+  );
 
-  if (step === 5) {
+  // ── Step 13: Seller credits ─────────────────────────────────────────
+  if (step===13) return (
+    <Q title="Are you requesting any seller credits?"
+      subtitle="Seller credits reduce your closing costs — the seller pays some of your fees."
+      helper="Closing costs typically run 2–5% of the loan amount. You can ask the seller to cover some of these costs ('seller concessions'). This is more common in slower markets or when a home has been listed a while. In a very competitive market, asking for credits may weaken your offer."
+      showHelper={showHelper} toggleHelper={toggleHelper}>
+      <OptionCard icon="🙅" label="No seller credits"
+        desc={`${PROPERTY.dom<=14?"This market is competitive — skipping credits strengthens your offer.":"A clean offer is usually preferred."}`}
+        badge={PROPERTY.dom<=14?"Recommended":""}
+        selected={d.sellerCredits===0}
+        onClick={()=>set("sellerCredits",0)}/>
+      <OptionCard icon="💰" label="Yes — request seller credits"
+        desc="Ask the seller to cover some of my closing costs."
+        selected={d.sellerCredits>0}
+        onClick={()=>set("sellerCredits",5000)}/>
+      {d.sellerCredits>0 && (
+        <div style={{marginTop:12}}>
+          <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Credit amount requested</label>
+          <div style={{position:"relative"}}>
+            <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"var(--gray-400)",fontSize:15}}>$</span>
+            <input type="number" value={d.sellerCredits} onChange={e=>set("sellerCredits",+e.target.value)}
+              className="input-field" style={{paddingLeft:28}}/>
+          </div>
+          <p style={{fontSize:12,color:"var(--gray-500)",marginTop:6}}>Typical: $3,000–$10,000. Your max is often capped by lender rules.</p>
+        </div>
+      )}
+    </Q>
+  );
+
+  // ── Step 14: Personal letter ────────────────────────────────────────
+  if (step===14) return (
+    <Q title="Add a personal letter to the seller?"
+      subtitle="A heartfelt letter can sometimes tip a close decision in your favor."
+      helper="Some sellers care deeply about who buys their home, especially if they've lived there for many years. A short, personal letter explaining who you are and why you love the home can create an emotional connection. Note: In some states, personal letters are discouraged to avoid fair housing issues — check with your attorney.">
+      <OptionCard icon="✉️" label="Yes — add a personal letter"
+        desc="I'll write a brief note about myself and why I love this home."
+        selected={d.personalLetter}
+        onClick={()=>set("personalLetter",true)}/>
+      <OptionCard icon="📋" label="No — keep it business only"
+        desc="Let the numbers speak. Clean, professional offer package."
+        selected={!d.personalLetter}
+        onClick={()=>set("personalLetter",false)}/>
+      {d.personalLetter && (
+        <div style={{marginTop:12}}>
+          <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Your personal letter</label>
+          <textarea rows={5} className="input-field" placeholder="Dear Seller, We are a family of four who fell in love with your home the moment we walked through the door..."
+            style={{resize:"vertical",lineHeight:1.6}}/>
+          <p style={{fontSize:12,color:"var(--gray-500)",marginTop:6}}>Keep it to 3–4 short paragraphs. Mention your family, why this neighborhood matters, and how you'll care for the home.</p>
+        </div>
+      )}
+    </Q>
+  );
+
+  // ── Step 15: Review ─────────────────────────────────────────────────
+  if (step===15) {
+    const rows = [
+      {section:"Property",   items:[["Address",`${PROPERTY.address}, ${PROPERTY.city}, ${PROPERTY.state}`],["List price",fmt(PROPERTY.price)]]},
+      {section:"Your Offer", items:[["Offer price",fmt(d.offerPrice)],["vs. asking price",d.offerPrice>=PROPERTY.price?`+${fmt(d.offerPrice-PROPERTY.price)} above`:`-${fmt(PROPERTY.price-d.offerPrice)} below`],["Earnest money",`${d.earnestPct}% · ${fmt(Math.round(d.offerPrice*d.earnestPct/100))}`]]},
+      {section:"Financing",  items:[[d.financeType==="cash"?"Payment":"Loan type",d.financeType==="cash"?"All cash":`${d.financeType} · ${d.downPct}% down`],["Pre-approved",d.financeType==="cash"?"N/A":d.preApproved?"Yes ✓":"No ⚠️"]]},
+      {section:"Timeline",   items:[["Target closing",`${d.closingDays} days`]]},
+      {section:"Contingencies", items:[["Inspection",d.inspectionContingency?`Yes · ${d.inspectionDays} days`:"Waived ⚠️"],["Appraisal",d.appraisalContingency?"Yes":"Waived ⚠️"],["Financing",d.financeType==="cash"?"N/A (cash)":d.financingContingency?`Yes · ${d.financingDays} days`:"Waived ⚠️"]]},
+      {section:"Terms",      items:[["Escalation",d.escalation?`Yes · up to ${fmt(d.escMax)}`:"No"],["Seller credits",d.sellerCredits>0?fmt(d.sellerCredits):"None"],["Personal letter",d.personalLetter?"Yes":"No"]]},
+    ];
     return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Contingencies</h2>
-        <p className="text-slate-500 mb-8">
-          Contingencies protect you if something goes wrong. Tap each to learn more.
-        </p>
-
-        <div className="space-y-4">
-          {[
-            {
-              key: "inspectionContingency",
-              title: "Inspection Contingency",
-              desc: "Allows you to back out or renegotiate if the inspection reveals serious issues.",
-              recommended: true,
-              riskIfWaived: "High — you could buy a home with hidden defects",
-              daysKey: "inspectionDays",
-              defaultDays: 10,
-            },
-            {
-              key: "appraisalContingency",
-              title: "Appraisal Contingency",
-              desc: "Protects you if the home appraises below your offer price. You can renegotiate or back out.",
-              recommended: true,
-              riskIfWaived: "Medium-High — you'd need to cover the gap in cash",
-              daysKey: null,
-              defaultDays: null,
-            },
-            {
-              key: "financingContingency",
-              title: "Financing Contingency",
-              desc: "Lets you exit the contract if your mortgage falls through.",
-              recommended: true,
-              riskIfWaived: "High — you could lose your earnest money",
-              daysKey: "financingDays",
-              defaultDays: 21,
-            },
-            {
-              key: "saleContingency",
-              title: "Sale Contingency",
-              desc: "Makes your offer contingent on selling your current home first.",
-              recommended: false,
-              riskIfWaived: "Low — only relevant if you own another home",
-              daysKey: null,
-              defaultDays: null,
-            },
-          ].map((contingency) => (
-            <div
-              key={contingency.key}
-              className={`rounded-2xl border-2 p-5 transition-all ${
-                offerData[contingency.key] ? "border-blue-200 bg-blue-50/50" : "border-slate-100 bg-white"
-              }`}
-            >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center cursor-pointer flex-shrink-0 mt-0.5 transition-all ${
-                    offerData[contingency.key]
-                      ? "border-blue-500 bg-blue-500"
-                      : "border-slate-300 hover:border-blue-400"
-                  }`}
-                  onClick={() => updateOffer(contingency.key, !offerData[contingency.key])}
-                >
-                  {!!offerData[contingency.key] && <CheckCircle className="w-4 h-4 text-white" />}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-sm font-bold text-slate-900">{contingency.title}</h3>
-                    {contingency.recommended && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-semibold">
-                        Recommended
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-slate-600 mb-2">{contingency.desc}</p>
-                  <p className={`text-xs ${offerData[contingency.key] ? "text-emerald-600" : "text-orange-600"}`}>
-                    {offerData[contingency.key] ? "✓ Protected" : `⚠ Risk: ${contingency.riskIfWaived}`}
-                  </p>
-
-                  {contingency.daysKey && !!offerData[contingency.key] && (
-                    <div className="mt-3 flex items-center gap-3">
-                      <span className="text-xs text-slate-500">Period:</span>
-                      {[7, 10, 14, 21].map((days) => (
-                        <button
-                          key={days}
-                          onClick={() => updateOffer(contingency.daysKey!, days)}
-                          className={`text-xs px-3 py-1 rounded-lg border transition-all ${
-                            offerData[contingency.daysKey as string] === days
-                              ? "border-blue-500 bg-blue-100 text-blue-700 font-semibold"
-                              : "border-slate-200 text-slate-600 hover:border-blue-300"
-                          }`}
-                        >
-                          {days} days
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+      <Q title="Review your offer" subtitle="Everything looks good. Confirm before generating your documents.">
+        <div className="card" style={{overflow:"hidden",marginBottom:16}}>
+          {rows.map(r=>(
+            <div key={r.section}>
+              <div style={{padding:"10px 20px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)"}}>
+                <span style={{fontSize:11,fontWeight:700,color:"var(--gray-500)",textTransform:"uppercase",letterSpacing:"0.05em"}}>{r.section}</span>
               </div>
+              {r.items.map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 20px",borderBottom:"1px solid var(--gray-100)"}}>
+                  <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
+                  <span style={{fontSize:13,fontWeight:600,color: String(v).includes("⚠️")?"var(--amber)":"var(--gray-900)"}}>{v}</span>
+                </div>
+              ))}
             </div>
           ))}
         </div>
-      </div>
+        <div className="good-box">
+          <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>✓ Your offer package is ready to generate. You'll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
+        </div>
+      </Q>
     );
   }
 
-  if (step === 6) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Additional Terms</h2>
-        <p className="text-slate-500 mb-8">Customize your offer with advanced features.</p>
-
-        <div className="space-y-6">
-          {/* Escalation clause */}
-          <div className={`rounded-2xl border-2 p-5 transition-all ${offerData.escalationClause ? "border-blue-200 bg-blue-50/30" : "border-slate-100"}`}>
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-0.5">Escalation Clause</h3>
-                <p className="text-xs text-slate-500">Automatically beats competing offers up to your max</p>
-              </div>
-              <button
-                onClick={() => updateOffer("escalationClause", !offerData.escalationClause)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  offerData.escalationClause ? "bg-blue-600" : "bg-slate-200"
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${offerData.escalationClause ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
+  // ── Step 16: Submit ─────────────────────────────────────────────────
+  return (
+    <Q title="Get your offer package" subtitle="Choose how you'd like to receive and deliver your offer.">
+      {[
+        {icon:"📄", title:"Download PDF package", desc:"Professional PDF with purchase agreement, addendums, and cover letter. You deliver it.", badge:"$29", href:"/pricing"},
+        {icon:"✉️", title:"Send directly to listing agent", desc:`Email to ${PROPERTY.agent} at ${PROPERTY.brokerage} with read receipt tracking.`, badge:"$99 Premium", href:"/pricing", featured:true},
+      ].map(o=>(
+        <Link key={o.title} href={o.href}
+          style={{display:"flex",alignItems:"flex-start",gap:16,padding:"20px",border:`1.5px solid ${o.featured?"var(--blue)":"var(--gray-200)"}`,
+            borderRadius:12,background:o.featured?"var(--blue-light)":"#fff",textDecoration:"none",marginBottom:10,transition:"all .15s"}}>
+          <span style={{fontSize:28,flexShrink:0}}>{o.icon}</span>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+              <span style={{fontSize:15,fontWeight:600,color:"var(--gray-900)"}}>{o.title}</span>
+              <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:o.featured?"var(--blue)":"var(--gray-200)",color:o.featured?"#fff":"var(--gray-600)"}}>{o.badge}</span>
             </div>
-            {!!offerData.escalationClause && (
-              <div className="grid grid-cols-2 gap-4 mt-4">
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Beat competing offers by</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={offerData.escalationIncrement as number}
-                      onChange={(e) => updateOffer("escalationIncrement", Number(e.target.value))}
-                      className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-1">Up to maximum of</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={offerData.escalationMax as number}
-                      onChange={(e) => updateOffer("escalationMax", Number(e.target.value))}
-                      className="w-full pl-7 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            <p style={{fontSize:13,color:"var(--gray-500)",lineHeight:1.5}}>{o.desc}</p>
           </div>
-
-          {/* Seller credits */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Request Seller Credits (optional)
-            </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Seller credits reduce your out-of-pocket closing costs. Common in buyers&apos; markets or when repairs are needed.
-            </p>
-            <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
-              <input
-                type="number"
-                value={offerData.sellerCredits as number}
-                onChange={(e) => updateOffer("sellerCredits", Number(e.target.value))}
-                placeholder="0"
-                className="w-full pl-8 pr-4 py-3 border-2 border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Attorney review */}
-          <div className="bg-slate-50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Attorney Review Period</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Standard in Illinois — allows attorneys to review and modify the contract within 5 business days of acceptance.
-                </p>
-              </div>
-              <div className="flex gap-2">
-                {[3, 5, 7].map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => updateOffer("attorneyReviewDays", days)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                      offerData.attorneyReviewDays === days
-                        ? "border-blue-500 bg-blue-100 text-blue-700 font-semibold"
-                        : "border-slate-200 text-slate-600 hover:border-blue-300"
-                    }`}
-                  >
-                    {days} days
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Personal letter */}
-          <div className={`rounded-2xl border-2 p-5 transition-all ${offerData.personalLetter ? "border-purple-200 bg-purple-50/30" : "border-slate-100"}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-0.5">Add Personal Letter to Seller</h3>
-                <p className="text-xs text-slate-500">
-                  A heartfelt letter can differentiate your offer. Our AI will help draft one based on the property.
-                </p>
-              </div>
-              <button
-                onClick={() => updateOffer("personalLetter", !offerData.personalLetter)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  offerData.personalLetter ? "bg-purple-600" : "bg-slate-200"
-                }`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${offerData.personalLetter ? "translate-x-6" : "translate-x-1"}`} />
-              </button>
-            </div>
-          </div>
-        </div>
+          <ArrowRight style={{width:16,height:16,color:"var(--gray-300)",flexShrink:0,marginTop:2}}/>
+        </Link>
+      ))}
+      <div className="warn-box" style={{marginTop:8}}>
+        <p style={{fontSize:12,color:"#92400e",lineHeight:1.5}}>⚖️ HomeOfferDirect is not a law firm. We strongly recommend having a licensed Illinois real estate attorney review your offer before submitting.</p>
       </div>
-    );
-  }
-
-  if (step === 7) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Review Your Offer</h2>
-        <p className="text-slate-500 mb-8">
-          Everything looks great! Review the key terms before generating your documents.
-        </p>
-
-        <div className="space-y-4">
-          {[
-            {
-              section: "Property",
-              items: [
-                { label: "Address", value: `${property.address}, ${property.city}, ${property.state}` },
-                { label: "Asking Price", value: formatCurrency(property.price) },
-              ],
-            },
-            {
-              section: "Your Offer",
-              items: [
-                { label: "Offer Price", value: formatCurrency(offerData.offerPrice as number) },
-                { label: "Difference", value: `${offerData.offerPrice as number > property.price ? "+" : ""}${formatCurrency((offerData.offerPrice as number) - property.price)}` },
-                { label: "Earnest Money", value: formatCurrency(offerData.earnestMoney as number) },
-              ],
-            },
-            {
-              section: "Financing",
-              items: [
-                { label: "Loan Type", value: (offerData.financeType as string).charAt(0).toUpperCase() + (offerData.financeType as string).slice(1) },
-                { label: "Down Payment", value: `${offerData.downPayment}% (${formatCurrency((offerData.offerPrice as number) * ((offerData.downPayment as number) / 100))})` },
-                { label: "Pre-Approved", value: offerData.preApproved ? "Yes ✓" : "No" },
-              ],
-            },
-            {
-              section: "Timeline",
-              items: [
-                { label: "Closing Date", value: offerData.closingDate ? new Date(offerData.closingDate as string).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "TBD" },
-                { label: "Attorney Review", value: `${offerData.attorneyReviewDays} business days` },
-              ],
-            },
-            {
-              section: "Contingencies",
-              items: [
-                { label: "Inspection", value: offerData.inspectionContingency ? `Yes — ${offerData.inspectionDays} days` : "Waived" },
-                { label: "Appraisal", value: offerData.appraisalContingency ? "Yes" : "Waived" },
-                { label: "Financing", value: offerData.financingContingency ? `Yes — ${offerData.financingDays} days` : "Waived" },
-                { label: "Sale", value: offerData.saleContingency ? "Yes" : "Not applicable" },
-              ],
-            },
-            {
-              section: "Advanced Terms",
-              items: [
-                { label: "Escalation Clause", value: offerData.escalationClause ? `Yes — up to ${formatCurrency(offerData.escalationMax as number)}` : "No" },
-                { label: "Seller Credits", value: (offerData.sellerCredits as number) > 0 ? formatCurrency(offerData.sellerCredits as number) : "None" },
-                { label: "Personal Letter", value: offerData.personalLetter ? "Yes, AI-drafted" : "No" },
-              ],
-            },
-          ].map(({ section, items }) => (
-            <div key={section} className="bg-slate-50 rounded-xl overflow-hidden">
-              <div className="px-4 py-2 bg-slate-100">
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{section}</p>
-              </div>
-              <div className="px-4 py-2">
-                {items.map(({ label, value }) => (
-                  <div key={label} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                    <span className="text-sm text-slate-500">{label}</span>
-                    <span className="text-sm font-semibold text-slate-900">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-6 bg-green-50 rounded-xl p-4 flex gap-3">
-          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-green-800">Offer ready to generate</p>
-            <p className="text-sm text-green-700 mt-0.5">
-              Your complete Illinois purchase contract, escalation clause addendum, and cover letter
-              are ready. Click &quot;Generate Offer&quot; to download or send.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (step === 8) {
-    return (
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-2">Submit Your Offer</h2>
-        <p className="text-slate-500 mb-8">
-          Choose how you want to deliver your professional offer package.
-        </p>
-
-        <div className="space-y-4">
-          {[
-            {
-              title: "Download PDF Package",
-              desc: "Download your complete offer package as a professionally formatted PDF.",
-              icon: Download,
-              badge: "Free",
-              badgeColor: "bg-slate-100 text-slate-600",
-              action: "Download",
-              actionColor: "border-slate-200 text-slate-700 hover:bg-slate-50",
-            },
-            {
-              title: "Send Directly to Listing Agent",
-              desc: `Email your offer to Sarah Johnson at Coldwell Banker with a professional cover letter. Includes read receipt tracking.`,
-              icon: Send,
-              badge: "Recommended",
-              badgeColor: "bg-blue-100 text-blue-700",
-              action: "Send Offer",
-              actionColor: "gradient-bg text-white hover:opacity-90",
-            },
-          ].map((option) => {
-            const Icon = option.icon;
-            return (
-              <Link
-                key={option.title}
-                href="/pricing"
-                className={`block bg-white rounded-2xl border-2 border-slate-200 p-6 hover:border-blue-300 transition-all hover:shadow-md`}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-6 h-6 text-slate-600" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-slate-900">{option.title}</h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${option.badgeColor}`}>
-                        {option.badge}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-500">{option.desc}</p>
-                  </div>
-                  <button className={`flex-shrink-0 px-5 py-2 rounded-xl border text-sm font-semibold transition-all ${option.actionColor}`}>
-                    {option.action}
-                  </button>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-
-        <div className="mt-6 bg-amber-50 rounded-xl p-4 flex gap-3 border border-amber-100">
-          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-amber-800">Attorney Review Recommended</p>
-            <p className="text-sm text-amber-700 mt-0.5">
-              HomeOfferDirect is a document automation tool, not a law firm. We strongly recommend
-              having a licensed real estate attorney in Illinois review your offer before submission.
-              Our Premium plan includes access to discounted attorney consultations.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </Q>
+  );
 }

@@ -8,6 +8,22 @@
   --muted: #f8fafc;
   --border: #e2e8f0;
 
+  --blue: #2563eb;
+  --blue-dark: #1d4ed8;
+  --blue-light: #eff6ff;
+  --gray-900: #111827;
+  --gray-700: #374151;
+  --gray-500: #6b7280;
+  --gray-300: #d1d5db;
+  --gray-200: #e5e7eb;
+  --gray-100: #f3f4f6;
+  --gray-50:  #f9fafb;
+  --green: #059669;
+  --amber: #d97706;
+  --red: #dc2626;
+  --radius: 16px;
+  --radius-sm: 10px;
+
   --font-inter: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-size-base: 16px;
   --line-height-base: 1.65;
@@ -71,6 +87,8 @@ p { line-height: var(--line-height-base); }
   .gradient-text { color: #2563eb; }
   .gradient-bg { background: #2563eb; }
   .gradient-bg-soft { background: #f0f6ff; }
+  .brand-gradient { background: #2563eb; }
+  .text-brand { color: #2563eb; }
 
   .glass {
     background: rgba(255, 255, 255, 0.88);
@@ -142,3 +160,32 @@ p { line-height: var(--line-height-base); }
 .delay-300 { animation-delay: 0.24s; }
 .delay-400 { animation-delay: 0.32s; }
 .delay-500 { animation-delay: 0.40s; }
+
+/* Offer builder utilities */
+@layer utilities {
+  .option-card {
+    display: flex; align-items: center; gap: 16px;
+    width: 100%; padding: 16px 20px;
+    background: #fff; border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm); cursor: pointer;
+    transition: border-color .15s, background .15s; text-align: left;
+  }
+  .option-card:hover { border-color: #93c5fd; background: var(--blue-light); }
+  .option-card.selected { border-color: var(--blue); background: var(--blue-light); }
+  .option-card .check { width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%; border: 1.5px solid var(--gray-300); display: flex; align-items: center; justify-content: center; transition: all .15s; }
+  .option-card.selected .check { border-color: var(--blue); background: var(--blue); }
+
+  .step-sidebar-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: var(--gray-500); transition: all .15s; }
+  .step-sidebar-item.done { color: var(--green); }
+  .step-sidebar-item.active { background: var(--blue-light); color: var(--blue); font-weight: 600; }
+
+  .input-field { width: 100%; padding: 14px 16px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-sm); font-size: 15px; color: var(--gray-900); background: #fff; transition: border-color .15s; outline: none; }
+  .input-field:focus { border-color: var(--blue); }
+
+  .helper-box { background: var(--blue-light); border-left: 3px solid var(--blue); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 12px 16px; }
+  .warn-box   { background: #fffbeb; border-left: 3px solid var(--amber); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 12px 16px; }
+  .good-box   { background: #f0fdf4; border-left: 3px solid var(--green); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; padding: 12px 16px; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-up { animation: fadeUp .35s ease-out both; }
+}

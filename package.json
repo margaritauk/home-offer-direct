@@ -11,7 +11,8 @@
     "test:e2e:desktop": "playwright test --project=desktop",
     "test:e2e:mobile": "playwright test --project=mobile",
     "db:migrate": "npx supabase@latest db push --db-url $DATABASE_URL",
-    "db:reset": "npx supabase@latest db reset --db-url $DATABASE_URL"
+    "db:reset": "npx supabase@latest db reset --db-url $DATABASE_URL",
+    "scrape:listings": "npx ts-node --project tsconfig.json scripts/scrape-listings.ts"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",

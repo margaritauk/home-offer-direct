@@ -1,13 +1,8 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import HowItWorks from "@/components/home/HowItWorks";
 import Link from "next/link";
-import { ArrowRight, CheckCircle, Search, FileText, Send } from "lucide-react";
-
-const STEPS = [
-  { icon: Search,   n: "1", title: "Find your home",        desc: "Search any address or paste a Zillow / Redfin URL." },
-  { icon: FileText, n: "2", title: "Build your offer",      desc: "Answer simple questions. AI explains every clause in plain English." },
-  { icon: Send,     n: "3", title: "Submit with confidence",desc: "Send a professional offer directly to the listing agent." },
-];
+import { ArrowRight, CheckCircle } from "lucide-react";
 
 export default function Home() {
   return (
@@ -62,36 +57,7 @@ export default function Home() {
         </section>
 
         {/* ── How it works ── */}
-        <section id="how-it-works" className="py-16 px-4 sm:px-6 bg-gray-50" data-testid="how-it-works">
-          <div className="max-w-3xl mx-auto">
-            <p className="text-center text-sm font-semibold text-blue-600 uppercase tracking-wide mb-10">How it works</p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
-              {STEPS.map((s, i) => {
-                const Icon = s.icon;
-                return (
-                  <div key={i} className="flex flex-col items-center text-center" data-testid={`step-${s.n}`}>
-                    <div className="w-12 h-12 rounded-xl brand-gradient flex items-center justify-center mb-3 shadow-sm">
-                      <Icon className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="text-xs font-bold text-gray-300 mb-1">STEP {s.n}</div>
-                    <h3 className="text-base font-semibold text-gray-900 mb-1">{s.title}</h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">{s.desc}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="text-center mt-10">
-              <Link
-                href="/offer-builder"
-                className="inline-flex items-center gap-2 text-white brand-gradient font-semibold px-8 py-3 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
-              >
-                Get started free <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-          </div>
-        </section>
+        <HowItWorks />
       </main>
       <Footer />
     </>

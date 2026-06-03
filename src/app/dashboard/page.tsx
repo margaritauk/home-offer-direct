@@ -531,6 +531,127 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* ── Verify Your Identity card ── */}
+        {isSupabaseUser && (
+          <div className={`mb-8 rounded-2xl border shadow-sm overflow-hidden ${verifyState.verified ? "border-green-200 bg-green-50" : "border-slate-100 bg-white"}`}>
+            <div className="px-8 py-5 flex items-center gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${verifyState.verified ? "bg-green-100" : "bg-blue-50"}`}>
+                <ShieldCheck className={`w-5 h-5 ${verifyState.verified ? "text-green-600" : "text-blue-600"}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                {verifyState.verified ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-green-700 bg-green-100 border border-green-200 px-3 py-1 rounded-full">
+                      <ShieldCheck className="w-4 h-4" /> Verified Buyer
+                    </span>
+                    {verifyState.verifiedAt && (
+                      <span className="text-xs text-green-600">
+                        Verified {new Date(verifyState.verifiedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+                      </span>
+                    )}
+                    <span className="text-xs text-green-600 font-medium">
+                      · Government ID and proof of funds on file — badge shown on your offer PDF and emails
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-semibold text-slate-900">Verify your identity</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Upload a government ID and proof of funds to display a <strong>Verified Buyer</strong> badge on your offers.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {!verifyState.verified && (
+              <div className="px-8 pb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Government ID upload */}
+                <div>
+                  <p className="text-xs font-medium text-slate-600 mb-2">
+                    Government ID <span className="font-normal text-slate-400">(driver&apos;s license or passport)</span>
+                  </p>
+                  <input
+                    ref={idInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    className="sr-only"
+                    disabled={verifyState.idUploading}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) handleVerifyUpload(f, "id");
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    onClick={() => idInputRef.current?.click()}
+                    disabled={verifyState.idUploading}
+                    className={`w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all ${
+                      verifyState.idUploaded
+                        ? "bg-green-50 border-green-200 text-green-700"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700"
+                    } disabled:opacity-50`}>
+                    {verifyState.idUploading ? (
+                      <><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Uploading…</>
+                    ) : verifyState.idUploaded ? (
+                      <><CheckCircle2 className="w-4 h-4"/> ID uploaded ✓</>
+                    ) : (
+                      <><Upload className="w-4 h-4"/> Upload government ID</>
+                    )}
+                  </button>
+                  {verifyState.idError && (
+                    <p className="text-xs text-red-600 mt-1.5">{verifyState.idError}</p>
+                  )}
+                </div>
+
+                {/* Proof of funds upload */}
+                <div>
+                  <p className="text-xs font-medium text-slate-600 mb-2">
+                    Proof of funds <span className="font-normal text-slate-400">(bank statement or pre-approval)</span>
+                  </p>
+                  <input
+                    ref={proofInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    className="sr-only"
+                    disabled={verifyState.proofUploading}
+                    onChange={e => {
+                      const f = e.target.files?.[0];
+                      if (f) handleVerifyUpload(f, "proof_of_funds");
+                      e.target.value = "";
+                    }}
+                  />
+                  <button
+                    onClick={() => proofInputRef.current?.click()}
+                    disabled={verifyState.proofUploading}
+                    className={`w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition-all ${
+                      verifyState.proofUploaded
+                        ? "bg-green-50 border-green-200 text-green-700"
+                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700"
+                    } disabled:opacity-50`}>
+                    {verifyState.proofUploading ? (
+                      <><span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"/> Uploading…</>
+                    ) : verifyState.proofUploaded ? (
+                      <><CheckCircle2 className="w-4 h-4"/> Proof uploaded ✓</>
+                    ) : (
+                      <><Upload className="w-4 h-4"/> Upload proof of funds</>
+                    )}
+                  </button>
+                  {verifyState.proofError && (
+                    <p className="text-xs text-red-600 mt-1.5">{verifyState.proofError}</p>
+                  )}
+                </div>
+
+                {/* Privacy notice */}
+                <p className="sm:col-span-2 text-xs text-slate-400 flex items-start gap-1.5 mt-1">
+                  <Lock className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                  Your ID is stored securely and only shared as part of your offer package.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 w-fit" data-testid="tabs">
           {(["overview","offers","saved","journey"] as Tab[]).map(tab => (

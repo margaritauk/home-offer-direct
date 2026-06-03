@@ -3,7 +3,8 @@ export const runtime = "nodejs";
 import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { renderToBuffer } from "@react-pdf/renderer";
+import type React from "react";
+import ReactPDF, { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { OfferSummaryPdf } from "@/components/pdf/OfferSummaryPdf";
 import type { OfferRow, PropertyRow } from "@/components/pdf/OfferSummaryPdf";
@@ -67,7 +68,10 @@ export async function GET(
   }
 
   /* ── Render PDF ── */
-  const element = createElement(OfferSummaryPdf, { offer, property });
+  const element = createElement(
+    OfferSummaryPdf,
+    { offer, property },
+  ) as React.ReactElement<ReactPDF.DocumentProps>;
   const pdfBuffer = await renderToBuffer(element);
 
   /* ── Upload to Supabase Storage ── */

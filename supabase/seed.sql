@@ -3,6 +3,8 @@
 
 BEGIN;
 
+-- WARNING: Re-running truncates properties CASCADE (deletes saved_homes and offers referencing these properties).
+-- Must be run as service_role (supabase db seed, or psql with service_role JWT).
 TRUNCATE public.properties RESTART IDENTITY CASCADE;
 
 INSERT INTO public.properties

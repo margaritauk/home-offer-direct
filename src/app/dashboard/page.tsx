@@ -75,10 +75,12 @@ const CALENDAR_DATES = [
 ];
 
 const STATUS_COLOR: Record<string, string> = {
-  pending:  "text-amber-700 bg-amber-50",
-  draft:    "text-slate-600 bg-slate-100",
-  accepted: "text-green-700 bg-green-50",
-  rejected: "text-red-600 bg-red-50",
+  pending:   "text-amber-700 bg-amber-50",
+  draft:     "text-slate-600 bg-slate-100",
+  accepted:  "text-green-700 bg-green-50",
+  rejected:  "text-red-600 bg-red-50",
+  submitted: "bg-blue-100 text-blue-700",
+  withdrawn: "bg-slate-100 text-slate-500",
 };
 
 type Tab = "overview" | "offers" | "saved" | "journey";
@@ -130,7 +132,7 @@ export default function DashboardPage() {
     })();
 
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user?.id]);
 
   if (loading || !user) {
     return (
@@ -366,10 +368,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              (["pending","draft","accepted","rejected"] as const).map(status => {
+              (["pending","submitted","draft","accepted","rejected","withdrawn"] as const).map(status => {
                 const group = activeOffers.filter(o => o.status === status);
                 if (!group.length) return null;
-                const statusLabel = { pending:"Pending", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted" }[status];
+                const statusLabel = { pending:"Pending", submitted:"Submitted", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted", withdrawn:"Withdrawn" }[status];
                 return (
                   <div key={status}>
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">{statusLabel}</h3>

@@ -160,7 +160,7 @@ function OfferBuilderInner() {
   const [showPricingModal, setShowPricingModal] = useState(false);
 
   // Supabase offer row ID — once created, subsequent saves use upsert with this id
-  const [supabaseOfferId, setSupabaseOfferId] = useState<string | null>(null);
+  const supabaseOfferId = useRef<string | null>(null);
   // Debounce timer ref for Supabase upserts
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -198,7 +198,7 @@ function OfferBuilderInner() {
           return;
         }
         if (data?.id && !offerId) {
-          setSupabaseOfferId(data.id as string);
+          supabaseOfferId.current = data.id as string;
         }
       } catch (err) {
         console.error("offer-builder: Supabase save error", err);
@@ -216,7 +216,7 @@ function OfferBuilderInner() {
   // On mount (step >= 1 or when user advances to step 2+): create initial draft
   useEffect(() => {
     if (step >= 1) {
-      upsertOfferToSupabase(step, d, supabaseOfferId);
+      upsertOfferToSupabase(step, d, supabaseOfferId.current);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -226,11 +226,14 @@ function OfferBuilderInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cleanup: cancel any pending debounced save on unmount
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
   const clearProgress = () => {
     try { localStorage.removeItem(storageKey); } catch {}
     setD(INITIAL_D);
     setStep(0);
-    setSupabaseOfferId(null);
+    supabaseOfferId.current = null;
     setShowHelper(false);
     setHint(false);
   };
@@ -252,7 +255,7 @@ function OfferBuilderInner() {
     setHint(false);
     // Supabase auto-save: trigger on advancing to step 2+ (after setup section starts)
     if (nextStep >= 1) {
-      upsertOfferToSupabase(nextStep, d, supabaseOfferId);
+      upsertOfferToSupabase(nextStep, d, supabaseOfferId.current);
     }
   };
   const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); setHint(false); };

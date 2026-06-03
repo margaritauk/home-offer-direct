@@ -99,6 +99,7 @@ function SearchContent() {
   // Properties state — starts with mock data, replaced by DB data when available
   const [properties, setProperties] = useState<Property[]>(ALL_PROPERTIES);
   const [propertiesLoading, setPropertiesLoading] = useState(SUPABASE_ENABLED);
+  const [usingDbProperties, setUsingDbProperties] = useState(false);
 
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
@@ -116,6 +117,7 @@ function SearchContent() {
           setProperties(ALL_PROPERTIES);
         } else {
           setProperties((data as DbPropertyRow[]).map(dbRowToProperty));
+          setUsingDbProperties(true);
         }
       } catch {
         if (!cancelled) setProperties(ALL_PROPERTIES);
@@ -136,7 +138,7 @@ function SearchContent() {
     const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
     if (p.price < min || p.price > max) return false;
     if (beds !== "any" && p.beds < parseInt(beds, 10)) return false;
-    if (propType !== "any" && p.type !== propType) return false;
+    if (!usingDbProperties && propType !== "any" && p.type !== propType) return false;
     const q = debouncedQuery.trim().toLowerCase();
     if (q && !p.address.toLowerCase().includes(q) && !p.city?.toLowerCase().includes(q)) return false;
     return true;

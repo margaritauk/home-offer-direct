@@ -9,7 +9,7 @@ export interface UserOffer {
   address: string;
   price: number;
   listPrice: number;
-  status: "pending" | "draft" | "accepted" | "rejected";
+  status: "pending" | "submitted" | "draft" | "accepted" | "rejected" | "withdrawn";
   label: string;
   date: string;
   img: string;

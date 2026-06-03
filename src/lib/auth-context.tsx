@@ -195,7 +195,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.auth.signInWithPassword({ email: key, password })
       );
       if (error) throw new Error(error.message);
-      // onAuthStateChange will update the user state
+      // Eagerly set the user so navigation to /dashboard doesn't race
+      // against onAuthStateChange and trigger the "no user" redirect guard.
+      const { data: { user: sbUser } } = await supabase.auth.getUser();
+      if (sbUser) {
+        const { data: profile } = await supabase
+          .from("users")
+          .select("name, tier, state")
+          .eq("id", sbUser.id)
+          .single();
+        setUser(supabaseUserToAuthUser(sbUser, profile ?? undefined));
+      }
     } else {
       const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
       const stored = users[key];

@@ -9,8 +9,48 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-const REDFIN_CSV_URL =
-  "https://www.redfin.com/stingray/api/gis-csv?al=1&market=chicago&num_homes=350&ord=redfin-recommended-asc&page_number=1&region_id=17420&region_type=6&sf=1,2,3,5,6,10,11&status=9&uipt=1,2,3,4,5,6,7,8&v=8";
+const REDFIN_BASE_URL =
+  "https://www.redfin.com/stingray/api/gis-csv?al=1&market=chicago&num_homes=350&ord=redfin-recommended-asc&page_number=1&region_id=17420&region_type=6&sf=1,2,3,5,6,10,11&status=9&v=8";
+
+// Property type name → Redfin uipt code
+const PROPERTY_TYPE_CODES: Record<string, string> = {
+  "Single Family": "1",
+  "Condo": "2",
+  "Townhouse": "3",
+  "Multi-Family": "4",
+};
+
+export interface ScrapeFilters {
+  priceMin?: number;
+  priceMax?: number;
+  minBeds?: number;
+  propertyTypes?: string[]; // "Single Family" | "Condo" | "Townhouse" | "Multi-Family"
+}
+
+function buildRedfinUrl(filters: ScrapeFilters = {}): string {
+  const params = new URLSearchParams();
+
+  // property types — default to all four if not specified
+  const types =
+    filters.propertyTypes && filters.propertyTypes.length > 0
+      ? filters.propertyTypes
+          .map((t) => PROPERTY_TYPE_CODES[t])
+          .filter(Boolean)
+      : ["1", "2", "3", "4"];
+  params.set("uipt", types.join(","));
+
+  if (filters.priceMin !== undefined) {
+    params.set("min_listing_price", String(filters.priceMin));
+  }
+  if (filters.priceMax !== undefined) {
+    params.set("max_listing_price", String(filters.priceMax));
+  }
+  if (filters.minBeds !== undefined) {
+    params.set("min_beds", String(filters.minBeds));
+  }
+
+  return `${REDFIN_BASE_URL}&${params.toString()}`;
+}
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -124,12 +164,15 @@ export interface ScrapeResult {
 
 export async function scrapeAndUpsert(
   supabaseUrl: string,
-  supabaseKey: string
+  supabaseKey: string,
+  filters: ScrapeFilters = {}
 ): Promise<ScrapeResult> {
   const errors: string[] = [];
 
+  const redfinUrl = buildRedfinUrl(filters);
+
   // Fetch CSV
-  const response = await fetch(REDFIN_CSV_URL, {
+  const response = await fetch(redfinUrl, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -221,9 +264,11 @@ async function main() {
 
   console.log("Fetching Redfin listings for Chicago, IL...");
 
+  const redfinUrl = buildRedfinUrl();
+
   let rows: Record<string, string>[];
   try {
-    const response = await fetch(REDFIN_CSV_URL, {
+    const response = await fetch(redfinUrl, {
       headers: {
         "User-Agent": USER_AGENT,
         Accept:
@@ -293,4 +338,14 @@ async function main() {
   console.log(`Done. Inserted/updated ${count} properties.`);
 }
 
-main();
+// Only run when executed directly as a script (not when imported as a module).
+// tsx sets process.argv[1] to the script path.
+const _isMain =
+  typeof process !== "undefined" &&
+  process.argv[1] != null &&
+  (process.argv[1].endsWith("scrape-listings.ts") ||
+    process.argv[1].endsWith("scrape-listings.js"));
+
+if (_isMain) {
+  main();
+}

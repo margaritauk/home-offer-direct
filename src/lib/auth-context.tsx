@@ -84,6 +84,17 @@ const SUPABASE_CONFIGURED =
   !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+/* ── Helpers ────────────────────────────────────────────────────────── */
+
+function withTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("Request timed out. Please check your connection and try again.")), ms)
+    ),
+  ]);
+}
+
 /* ── Supabase path ──────────────────────────────────────────────────── */
 
 async function getSupabaseClient() {
@@ -180,7 +191,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (SUPABASE_CONFIGURED) {
       const supabase = await getSupabaseClient();
-      const { error } = await supabase.auth.signInWithPassword({ email: key, password });
+      const { error } = await withTimeout(
+        supabase.auth.signInWithPassword({ email: key, password })
+      );
       if (error) throw new Error(error.message);
       // onAuthStateChange will update the user state
     } else {
@@ -203,21 +216,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (SUPABASE_CONFIGURED) {
       const supabase = await getSupabaseClient();
-      const { data, error } = await supabase.auth.signUp({
-        email: key,
-        password,
-        options: { data: { name: name.trim() } },
-      });
+      const { data, error } = await withTimeout(
+        supabase.auth.signUp({
+          email: key,
+          password,
+          options: { data: { name: name.trim() } },
+        })
+      );
       if (error) throw new Error(error.message);
       if (data.user) {
-        // Insert the public profile row
-        await supabase.from("users").insert({
+        // Insert the public profile row — best-effort, non-blocking
+        supabase.from("users").insert({
           id: data.user.id,
           name: name.trim(),
           email: key,
           tier: "free",
           state,
-        });
+        }).then(() => {/* profile created */}).catch(() => {/* will be created on next login */});
         // onAuthStateChange will update the user state
       }
     } else {

@@ -52,6 +52,15 @@ export async function GET(
 
   const offer = offerData as OfferRow;
 
+  /* ── Fetch user's verification status ── */
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("id_verified_at")
+    .eq("id", user.id)
+    .single();
+
+  const isVerified = !!(userProfile?.id_verified_at);
+
   /* ── Fetch property row (for beds/baths/sqft) if property_id is set ── */
   let property: PropertyRow | null = null;
   if (offer.property_id) {
@@ -71,7 +80,7 @@ export async function GET(
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
   const { renderToBuffer } = require("@react-pdf/renderer") as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const element = createElement(OfferSummaryPdf, { offer, property }) as any;
+  const element = createElement(OfferSummaryPdf, { offer, property, isVerified }) as any;
   const pdfBuffer: Buffer = await renderToBuffer(element);
 
   /* ── Upload to Supabase Storage ── */

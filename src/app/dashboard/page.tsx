@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
@@ -11,6 +11,7 @@ import {
   DollarSign, Download, MessageSquare, Bed, Bath,
   ChevronRight, Sparkles, Heart, MapPin, Lock,
   CheckCircle2, Circle, CalendarDays, AlertCircle, ArrowRight, Phone, Mail,
+  PenLine, ShieldCheck, ShieldOff, X, ChevronDown, Upload,
 } from "lucide-react";
 
 /* ── Supabase detection (mirrors auth-context.tsx pattern) ──────────── */
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
   accepted:  "Accepted",
   rejected:  "Not accepted",
   withdrawn: "Withdrawn",
+  counter:   "Counter-offer received",
 };
 
 interface DbOfferRow {
@@ -37,11 +39,34 @@ interface DbOfferRow {
   property_address: string | null;
   address: string | null;
   created_at: string;
+  terms?: Record<string, unknown> | null;
+  notes?: string | null;
 }
 
-function dbRowToUserOffer(row: DbOfferRow): UserOffer {
+/* Extended local offer that carries signature and notes data */
+interface ExtendedOffer extends UserOffer {
+  signatureDataUrl?: string;
+  signatureDate?: string;
+  notes?: string;
+}
+
+function formatSignatureDate(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleDateString("en-US", {
+      month: "long", day: "numeric", year: "numeric",
+    }) + " at " + d.toLocaleTimeString("en-US", {
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  } catch {
+    return isoString;
+  }
+}
+
+function dbRowToExtendedOffer(row: DbOfferRow): ExtendedOffer {
   const resolvedAddress = row.property_address ?? row.address ?? "Address not provided";
   const statusKey = row.status as UserOffer["status"];
+  const terms = row.terms ?? {};
   return {
     id: row.id,
     address: resolvedAddress,
@@ -51,8 +76,32 @@ function dbRowToUserOffer(row: DbOfferRow): UserOffer {
     label: STATUS_LABEL[row.status] ?? row.status,
     date: new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     img: "",
+    signatureDataUrl: (terms.signatureDataUrl as string | undefined) ?? undefined,
+    signatureDate: (terms.signatureDate as string | undefined) ?? undefined,
+    notes: row.notes ?? undefined,
   };
 }
+
+/* Keep backwards compat shim for non-Supabase (mock) offers */
+function userOfferToExtended(o: UserOffer): ExtendedOffer {
+  return { ...o };
+}
+
+/* Status options for the Update Status modal */
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "pending",   label: "Pending response" },
+  { value: "accepted",  label: "Accepted" },
+  { value: "rejected",  label: "Rejected" },
+  { value: "counter",   label: "Counter-offer received" },
+  { value: "withdrawn", label: "Withdrawn" },
+];
+
+const STATUS_GUIDANCE: Record<string, string> = {
+  accepted:  "Congratulations! Time to schedule your inspection and connect with your lender.",
+  rejected:  "Sorry to hear that. Consider adjusting your offer strategy or looking at other properties.",
+  counter:   "The seller responded with a counter. Review the terms and decide how to proceed.",
+  withdrawn: "Offer withdrawn. You can start a new offer anytime.",
+};
 
 /* ── Journey milestones ─────────────────────────────────────────── */
 type MilestoneStatus = "done" | "active" | "upcoming";
@@ -83,15 +132,74 @@ const STATUS_COLOR: Record<string, string> = {
   withdrawn: "bg-slate-100 text-slate-500",
 };
 
+/* ── Signed badge helper ────────────────────────────────────────────── */
+function SignedBadge({ offer }: { offer: ExtendedOffer }) {
+  const isSigned = !!offer.signatureDataUrl;
+  if (isSigned) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">
+        <ShieldCheck className="w-3 h-3"/> Signed
+        {offer.signatureDate && (
+          <span className="font-normal text-green-600 ml-0.5">
+            · {formatSignatureDate(offer.signatureDate)}
+          </span>
+        )}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+      <ShieldOff className="w-3 h-3"/> Unsigned
+    </span>
+  );
+}
+
 type Tab = "overview" | "offers" | "saved" | "journey";
+
+/* ── Status update modal state ──────────────────────────────────────── */
+interface StatusModalState {
+  offerId: string;
+  currentStatus: string;
+  selectedStatus: string;
+  notes: string;
+  submitting: boolean;
+  guidanceMessage: string | null;
+}
+
+/* ── Verify identity card state ─────────────────────────────────────── */
+interface VerifyState {
+  idUploaded: boolean;
+  proofUploaded: boolean;
+  verified: boolean;
+  verifiedAt: string | null;
+  idUploading: boolean;
+  proofUploading: boolean;
+  idError: string | null;
+  proofError: string | null;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
   const features = useTierFeatures();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
-  const [dbOffers, setDbOffers] = useState<UserOffer[]>([]);
+  const [dbOffers, setDbOffers] = useState<ExtendedOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
+  const [statusModal, setStatusModal] = useState<StatusModalState | null>(null);
+
+  /* ── Identity verification state ─────────────────────────────────── */
+  const [verifyState, setVerifyState] = useState<VerifyState>({
+    idUploaded: false,
+    proofUploaded: false,
+    verified: false,
+    verifiedAt: null,
+    idUploading: false,
+    proofUploading: false,
+    idError: null,
+    proofError: null,
+  });
+  const idInputRef = useRef<HTMLInputElement>(null);
+  const proofInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
@@ -116,13 +224,13 @@ export default function DashboardPage() {
         );
         const { data, error } = await supabase
           .from("offers")
-          .select("id, status, offer_price, list_price, property_address, address, created_at")
+          .select("id, status, offer_price, list_price, property_address, address, created_at, terms, notes")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
         if (!cancelled) {
           if (!error && data) {
-            setDbOffers((data as DbOfferRow[]).map(dbRowToUserOffer));
+            setDbOffers((data as DbOfferRow[]).map(dbRowToExtendedOffer));
           }
           setOffersLoading(false);
         }
@@ -133,6 +241,79 @@ export default function DashboardPage() {
 
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  /* ── Fetch current verification status from Supabase ─────────────── */
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED || !user) return;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(user.id)) return;
+
+    (async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr");
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data } = await supabase
+          .from("users")
+          .select("id_document_path, proof_of_funds_path, id_verified_at")
+          .eq("id", user.id)
+          .single();
+        if (data) {
+          setVerifyState(prev => ({
+            ...prev,
+            idUploaded: !!(data.id_document_path),
+            proofUploaded: !!(data.proof_of_funds_path),
+            verified: !!(data.id_verified_at),
+            verifiedAt: data.id_verified_at ?? null,
+          }));
+        }
+      } catch { /* non-fatal */ }
+    })();
+  }, [user?.id]);
+
+  /* ── Handle identity document upload ─────────────────────────────── */
+  async function handleVerifyUpload(file: File, type: "id" | "proof_of_funds") {
+    const errorKey = type === "id" ? "idError" : "proofError";
+    const uploadingKey = type === "id" ? "idUploading" : "proofUploading";
+
+    const ALLOWED = ["image/jpeg", "image/png", "application/pdf"];
+    if (!ALLOWED.includes(file.type)) {
+      setVerifyState(prev => ({ ...prev, [errorKey]: "Only JPEG, PNG, or PDF files are accepted." }));
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setVerifyState(prev => ({ ...prev, [errorKey]: "File must be 10 MB or smaller." }));
+      return;
+    }
+
+    setVerifyState(prev => ({ ...prev, [uploadingKey]: true, [errorKey]: null }));
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", type);
+
+      const res = await fetch("/api/verify/upload-id", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Upload failed");
+      }
+      const result = await res.json() as { verified: boolean; idUploaded: boolean; proofUploaded: boolean };
+      setVerifyState(prev => ({
+        ...prev,
+        idUploaded: result.idUploaded,
+        proofUploaded: result.proofUploaded,
+        verified: result.verified,
+        verifiedAt: result.verified ? (prev.verifiedAt ?? new Date().toISOString()) : prev.verifiedAt,
+        [uploadingKey]: false,
+      }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Upload failed. Please try again.";
+      setVerifyState(prev => ({ ...prev, [uploadingKey]: false, [errorKey]: msg }));
+    }
+  }
 
   if (loading || !user) {
     return (
@@ -148,7 +329,9 @@ export default function DashboardPage() {
      TEST_ACCOUNTS mock offers for localStorage / test-account sessions. */
   const UUID_REGEX_DISPLAY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const isSupabaseUser = SUPABASE_CONFIGURED && UUID_REGEX_DISPLAY.test(user.id);
-  const activeOffers = isSupabaseUser ? dbOffers : user.offers;
+  const activeOffers: ExtendedOffer[] = isSupabaseUser
+    ? dbOffers
+    : user.offers.map(userOfferToExtended);
 
   const pendingCount = activeOffers.filter(o => o.status === "pending").length;
   const draftCount   = activeOffers.filter(o => o.status === "draft").length;
@@ -201,9 +384,123 @@ export default function DashboardPage() {
     { icon: Heart,    color:"text-red-600 bg-red-50",         title:"Save homes you like", desc:"Heart homes while browsing to track them and contact agents directly.", action:"Browse Homes" },
   ];
 
+  /* ── Status update handlers ─────────────────────────────────────── */
+  function openStatusModal(offer: ExtendedOffer) {
+    setStatusModal({
+      offerId: offer.id,
+      currentStatus: offer.status,
+      selectedStatus: offer.status === "draft" ? "pending" : offer.status,
+      notes: offer.notes ?? "",
+      submitting: false,
+      guidanceMessage: null,
+    });
+  }
+
+  async function submitStatusUpdate() {
+    if (!statusModal) return;
+    setStatusModal(prev => prev ? { ...prev, submitting: true } : prev);
+    try {
+      const res = await fetch(`/api/offers/${statusModal.offerId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: statusModal.selectedStatus,
+          notes: statusModal.notes,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to update status");
+      }
+      /* Optimistically update local state */
+      const newLabel = STATUS_LABEL[statusModal.selectedStatus] ?? statusModal.selectedStatus;
+      setDbOffers(prev =>
+        prev.map(o =>
+          o.id === statusModal.offerId
+            ? { ...o, status: statusModal.selectedStatus as UserOffer["status"], label: newLabel, notes: statusModal.notes }
+            : o
+        )
+      );
+      const guidance = STATUS_GUIDANCE[statusModal.selectedStatus] ?? null;
+      setStatusModal(prev => prev ? { ...prev, submitting: false, guidanceMessage: guidance } : prev);
+    } catch (e) {
+      console.error(e);
+      setStatusModal(prev => prev ? { ...prev, submitting: false } : prev);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
+
+      {/* ── Status Update Modal ─────────────────────────────────────── */}
+      {statusModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7">
+            {statusModal.guidanceMessage ? (
+              <>
+                <div className="flex items-center gap-3 mb-5">
+                  <CheckCircle2 className="w-6 h-6 text-green-500 flex-shrink-0"/>
+                  <h3 className="text-base font-semibold text-slate-900">Status updated</h3>
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed mb-7">
+                  {statusModal.guidanceMessage}
+                </p>
+                <button
+                  onClick={() => setStatusModal(null)}
+                  className="w-full py-2.5 gradient-bg text-white font-semibold rounded-xl text-sm hover:opacity-90">
+                  Done
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-base font-semibold text-slate-900">Update offer status</h3>
+                  <button onClick={() => setStatusModal(null)} className="p-1 text-slate-400 hover:text-slate-600">
+                    <X className="w-4 h-4"/>
+                  </button>
+                </div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Status</label>
+                <div className="relative mb-4">
+                  <select
+                    value={statusModal.selectedStatus}
+                    onChange={e => setStatusModal(prev => prev ? { ...prev, selectedStatus: e.target.value } : prev)}
+                    className="w-full appearance-none border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 pr-9">
+                    {STATUS_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                </div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">
+                  Notes <span className="font-normal">(optional)</span>
+                </label>
+                <textarea
+                  value={statusModal.notes}
+                  onChange={e => setStatusModal(prev => prev ? { ...prev, notes: e.target.value } : prev)}
+                  rows={3}
+                  placeholder="e.g. Seller countered at $510,000 with closing in 30 days…"
+                  className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-300 resize-none mb-6"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setStatusModal(null)}
+                    className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50">
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitStatusUpdate}
+                    disabled={statusModal.submitting}
+                    className="flex-1 py-2.5 gradient-bg text-white font-semibold rounded-xl text-sm hover:opacity-90 disabled:opacity-50">
+                    {statusModal.submitting ? "Saving…" : "Confirm"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24">
 
         {/* Welcome header */}
@@ -287,10 +584,18 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate">{o.address}</p>
                         <p className="text-lg font-black text-slate-900">{formatCurrency(o.price)}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[o.status]}`}>{o.label}</span>
+                          <SignedBadge offer={o}/>
                           <span className="text-xs text-slate-400">{o.date}</span>
                         </div>
+                        {!o.signatureDataUrl && (
+                          <Link
+                            href={`/offer-builder?id=${o.id}&step=15`}
+                            className="inline-flex items-center gap-1 text-xs text-amber-600 font-semibold mt-1.5 hover:underline">
+                            <PenLine className="w-3 h-3"/> Sign before sending to agent
+                          </Link>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {o.status==="draft" && (
@@ -299,6 +604,12 @@ export default function DashboardPage() {
                             Continue
                           </Link>
                         )}
+                        <button
+                          onClick={() => openStatusModal(o)}
+                          title="Update status"
+                          className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-xs font-medium flex items-center gap-1">
+                          <Send className="w-3.5 h-3.5"/>
+                        </button>
                         {features.pdfDownload ? (
                           <button title="Download PDF" className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
                             <Download className="w-3.5 h-3.5" />
@@ -394,6 +705,23 @@ export default function DashboardPage() {
                                 <p className="text-xs text-slate-400 mt-1">{offer.date}</p>
                               </div>
                             </div>
+                            {/* Signature status */}
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                              <SignedBadge offer={offer}/>
+                              {!offer.signatureDataUrl && (
+                                <Link
+                                  href={`/offer-builder?id=${offer.id}&step=15`}
+                                  className="inline-flex items-center gap-1 text-xs text-amber-600 font-semibold hover:underline">
+                                  <PenLine className="w-3 h-3"/> Sign now before sending to agent
+                                </Link>
+                              )}
+                            </div>
+                            {/* Notes */}
+                            {offer.notes && (
+                              <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 mt-3 leading-relaxed">
+                                <span className="font-medium text-slate-700">Notes: </span>{offer.notes}
+                              </p>
+                            )}
                             <div className="flex items-center gap-3 mt-6 flex-wrap">
                               {offer.status==="draft" && (
                                 <Link href="/offer-builder"
@@ -412,6 +740,12 @@ export default function DashboardPage() {
                                   <PlusCircle className="w-4 h-4"/> New Offer on This Property
                                 </Link>
                               )}
+                              {/* Update status button */}
+                              <button
+                                onClick={() => openStatusModal(offer)}
+                                className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-semibold hover:bg-slate-200">
+                                <Send className="w-4 h-4"/> Update status
+                              </button>
                               {features.pdfDownload ? (
                                 <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">
                                   <Download className="w-4 h-4"/> Download

@@ -36,6 +36,15 @@ export async function POST(
     return NextResponse.json({ error: "Offer not found" }, { status: 404 });
   }
 
+  // Fetch user's verification status
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("id_verified_at")
+    .eq("id", user.id)
+    .single();
+
+  const isVerified = !!(userProfile?.id_verified_at);
+
   // Update status to submitted
   const { error: updateError } = await supabase
     .from("offers")
@@ -50,7 +59,7 @@ export async function POST(
 
   // Send confirmation email — failure here must not fail the response
   try {
-    await sendOfferConfirmation(offer, user.email!);
+    await sendOfferConfirmation(offer, user.email!, isVerified);
   } catch (emailErr) {
     console.error("[submit] Offer confirmation email failed", emailErr);
   }

@@ -24,7 +24,8 @@ function computeClosingDate(createdAt: string, closingDays: number): string {
 
 export async function sendOfferConfirmation(
   offer: OfferForEmail,
-  userEmail: string
+  userEmail: string,
+  isVerified = false
 ): Promise<void> {
   if (!process.env.RESEND_API_KEY) {
     console.warn(
@@ -119,6 +120,15 @@ export async function sendOfferConfirmation(
           </p>
           ${isCash ? '<p style="font-size: 12px; color: #2563eb; margin: 4px 0 0; font-weight: 500;">No financing contingency</p>' : ""}
         </div>
+
+        ${isVerified ? `<!-- Verified Buyer badge -->
+        <div style="display: flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 10px; padding: 12px 16px; margin-bottom: 24px;">
+          <span style="font-size: 16px;">✓</span>
+          <div>
+            <p style="font-size: 13px; font-weight: 700; color: #16a34a; margin: 0;">Verified Buyer</p>
+            <p style="font-size: 12px; color: #15803d; margin: 4px 0 0;">Government ID and proof of funds on file</p>
+          </div>
+        </div>` : ""}
 
         <!-- Summary table -->
         <table style="width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 24px;">

@@ -247,6 +247,26 @@ const styles = StyleSheet.create({
     fontSize: 7,
     color: colors.gray500,
   },
+  // Verified Buyer badge
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    borderStyle: "solid",
+    borderRadius: 4,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    marginTop: 6,
+  },
+  verifiedBadgeText: {
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: "#16a34a",
+    letterSpacing: 0.4,
+  },
   // Personal letter page
   letterPage: {
     fontFamily: "Helvetica",
@@ -440,9 +460,10 @@ function DataRow({
 export interface OfferSummaryPdfProps {
   offer: OfferRow;
   property?: PropertyRow | null;
+  isVerified?: boolean;
 }
 
-export function OfferSummaryPdf({ offer, property }: OfferSummaryPdfProps) {
+export function OfferSummaryPdf({ offer, property, isVerified }: OfferSummaryPdfProps) {
   const t = offer.terms ?? {};
   const isCash = t.financeType === "cash";
 
@@ -496,6 +517,13 @@ export function OfferSummaryPdf({ offer, property }: OfferSummaryPdfProps) {
             Submitted {submittedDate}
             {stateCode ? `  ·  ${stateFormName(stateCode)}` : ""}
           </Text>
+          {isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Text style={styles.verifiedBadgeText}>
+                ✓ Verified Buyer — Government ID &amp; proof of funds on file
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* ── 1. Property Details ── */}

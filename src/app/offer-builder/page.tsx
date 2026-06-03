@@ -1124,10 +1124,17 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
         selected={d.inspectionContingency===true && d.inspectionDays===7}
         onClick={()=>{set("inspectionContingency",true); set("inspectionDays",7);}}/>
       <OptionCard icon="🚫" label="No — waive the inspection contingency"
-        desc="Strongest offer — but you accept the home in its current condition."
+        desc="Strongest offer — but you accept the home in its current condition (as-is)."
         warn={true}
         selected={d.inspectionContingency===false}
         onClick={()=>set("inspectionContingency",false)}/>
+      {/* As-is tip shown contextually when waiving */}
+      {d.inspectionContingency===false && (
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",background:"var(--blue-light)",borderRadius:8,marginTop:-4,marginBottom:4}}>
+          <TermTip tip={TIPS.asIs}/>
+          <p style={{fontSize:12,color:"var(--blue)",lineHeight:1.5,marginLeft:2}}>What does <strong>&ldquo;as-is&rdquo;</strong> mean? Click the icon to learn more.</p>
+        </div>
+      )}
       {d.inspectionContingency===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ <strong>High risk:</strong> Without an inspection, you could be responsible for costly hidden defects — HVAC failures, foundation issues, roof damage, etc. We strongly advise against this unless you're very familiar with the property.</p>
@@ -1139,6 +1146,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 10: Appraisal contingency ─────────────────────────────────
   if (step===10) return (
     <Q title="Do you want an appraisal contingency?"
+      titleTip={TIPS.appraisalContingency}
       subtitle="This protects you if the bank says the home is worth less than your offer price."
       helper="When you get a mortgage, your lender requires a professional appraisal. If the home appraises below your offer price, the lender won't loan you the full amount. An appraisal contingency lets you renegotiate or back out. Without it, you'd need to cover the gap in cash."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -1162,6 +1170,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 11: Financing contingency ─────────────────────────────────
   if (step===11) return (
     <Q title="Do you want a financing contingency?"
+      titleTip={TIPS.financingContingency}
       subtitle="This lets you walk away if your mortgage falls through."
       helper="Even with a pre-approval, mortgages can fall through — your financial situation could change, the property might not qualify, or interest rates could move. A financing contingency means if you can't get your loan within the agreed period, you can back out and get your earnest money back."
       showHelper={showHelper} toggleHelper={toggleHelper}>

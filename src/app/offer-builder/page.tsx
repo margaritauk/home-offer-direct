@@ -1048,7 +1048,8 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
 
   // ── Step 7: Earnest money ───────────────────────────────────────────
   if (step===7) return (
-    <Q title="How much earnest money will you deposit?"
+    <Q title="How much earnest money (EMD) will you deposit?"
+      titleTip={TIPS.earnestMoney}
       subtitle="This is a good-faith deposit that shows you're serious."
       helper="Earnest money is a deposit you make when your offer is accepted. It's held in an escrow account and applied to your down payment at closing. If you back out for reasons not covered by contingencies, you may lose this money. In Illinois, 2% of the purchase price is standard."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -1074,6 +1075,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 8: Closing timeline ────────────────────────────────────────
   if (step===8) return (
     <Q title="When do you want to close?"
+      titleTip={TIPS.closingDate}
       subtitle="The closing date is when you get the keys and the home becomes yours."
       helper="The closing date is typically 30–45 days after offer acceptance. This gives time for inspections, appraisal, and your lender to finalize the loan. Sellers sometimes prefer faster or slower closings depending on their situation — offering flexibility can make your offer stand out."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -1109,6 +1111,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 9: Inspection contingency ─────────────────────────────────
   if (step===9) return (
     <Q title="Do you want an inspection contingency?"
+      titleTip={TIPS.inspectionContingency}
       subtitle="This lets you back out or renegotiate if the home inspection finds serious problems."
       helper="An inspection contingency gives you the right to hire a professional inspector to examine the home. If they find major issues, you can request repairs, ask for a price reduction, or walk away and get your earnest money back. Waiving this saves time but means you're buying 'as-is' — risky for older homes."
       showHelper={showHelper} toggleHelper={toggleHelper}>

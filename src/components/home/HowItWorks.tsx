@@ -7,8 +7,8 @@ const steps = [
     step: "01",
     title: "Find your property",
     description:
-      "Search any listing or paste a Zillow, Redfin, or Realtor.com URL. We pull price, photos, taxes, and real-time market data automatically.",
-    details: ["Zillow & Redfin import", "Auto-fill property data", "AI market analysis"],
+      "Search Chicago-area listings or enter your own property address. We guide you through every detail of your offer — no import needed.",
+    details: ["5-state coverage", "Enter any property address", "AI offer guidance"],
     href: "/search",
     cta: "Search listings",
   },
@@ -39,7 +39,7 @@ const steps = [
     title: "Submit with confidence",
     description:
       "Download a professional offer package or send directly to the listing agent. Your documents are indistinguishable from agent-submitted offers.",
-    details: ["PDF download in seconds", "Direct agent email delivery", "Offer tracking dashboard"],
+    details: ["PDF download in seconds", "Direct agent email delivery", "Professional PDF package"],
     href: "/pricing",
     cta: "See pricing",
   },

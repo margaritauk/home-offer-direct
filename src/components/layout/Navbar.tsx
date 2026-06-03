@@ -158,7 +158,9 @@ export default function Navbar() {
           <button
             className="md:hidden w-9 h-9 flex items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 transition-all"
             onClick={() => setMobileOpen(!mobileOpen)}
-            aria-label="Toggle menu"
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            aria-controls="mobile-nav-menu"
           >
             {mobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -168,6 +170,7 @@ export default function Navbar() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div
+          id="mobile-nav-menu"
           className="md:hidden bg-white border-t border-slate-100"
           style={{
             paddingLeft: "max(16px,env(safe-area-inset-left))",

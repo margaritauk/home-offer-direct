@@ -55,7 +55,7 @@ const CALENDAR_DATES = [
 ];
 
 const STATUS_COLOR: Record<string, string> = {
-  pending:  "text-amber-600 bg-amber-50",
+  pending:  "text-amber-700 bg-amber-50",
   draft:    "text-slate-600 bg-slate-100",
   accepted: "text-green-700 bg-green-50",
   rejected: "text-red-600 bg-red-50",

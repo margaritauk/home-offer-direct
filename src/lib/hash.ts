@@ -1,0 +1,11 @@
+/**
+ * SHA-256 hash using Web Crypto API (available in all modern browsers + Next.js)
+ * Returns hex string. Used to hash passwords before storing — never store plaintext.
+ */
+export async function sha256(text: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}

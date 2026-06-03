@@ -2,7 +2,8 @@
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -76,7 +77,7 @@ const INITIAL_D: D = {
 function canContinue(step:number, d:D): boolean {
   switch(step) {
     case 0:  return d.buyerType !== "";
-    case 1:  return d.state !== "";
+    case 1:  return d.state !== null && d.state !== "";
     case 2:  return d.financeType !== "";
     case 3:  return true;
     case 4:  return d.offerPrice > 0;
@@ -148,6 +149,7 @@ function OfferBuilderInner() {
   const [hint, setHint] = useState(false);
   const [dateValue, setDateValue] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [showPricingModal, setShowPricingModal] = useState(false);
 
   // Persist to localStorage whenever d or step changes
   useEffect(() => {
@@ -155,6 +157,11 @@ function OfferBuilderInner() {
       localStorage.setItem(storageKey, JSON.stringify({ step, d }));
     } catch {}
   }, [d, step, storageKey]);
+
+  useEffect(() => {
+    track({ event: "offer_builder_started", property_id: property.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clearProgress = () => {
     try { localStorage.removeItem(storageKey); } catch {}
@@ -175,6 +182,7 @@ function OfferBuilderInner() {
       return;
     }
     setStep(s=>Math.min(TOTAL-1,s+1));
+    track({ event: "offer_builder_step_completed", step, step_name: activeSection?.label ?? "" });
     setShowHelper(false);
     setHint(false);
   };
@@ -202,10 +210,10 @@ function OfferBuilderInner() {
             style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:continueDisabled?"not-allowed":"pointer",opacity:continueDisabled?0.5:1,transition:"opacity .15s"}}>
             Continue <ArrowRight style={{width:15,height:15}}/>
           </button>
-        : <Link href="/pricing"
-            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",borderRadius:10,fontSize:14,fontWeight:600,textDecoration:"none"}}>
+        : <button onClick={() => { track({ event: "offer_builder_submitted" }); setShowPricingModal(true); }}
+            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
             Get my offer package <ArrowRight style={{width:15,height:15}}/>
-          </Link>
+          </button>
       }
     </>
   );
@@ -339,6 +347,68 @@ function OfferBuilderInner() {
           </div>
         </>
       )}
+
+      {showPricingModal && (
+        <>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.45)",zIndex:200}} onClick={() => setShowPricingModal(false)}/>
+          <div role="dialog" aria-modal="true" aria-labelledby="pricing-modal-title"
+            style={{position:"fixed",zIndex:201,top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:"min(640px,calc(100vw - 32px))",background:"#fff",borderRadius:16,boxShadow:"0 25px 60px -12px rgba(0,0,0,0.3)",maxHeight:"90vh",overflowY:"auto"}}>
+            {/* Header */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"20px 24px",borderBottom:"1px solid var(--gray-200)"}}>
+              <h2 id="pricing-modal-title" style={{fontSize:18,fontWeight:700,color:"var(--gray-900)",margin:0}}>Get your offer package</h2>
+              <button onClick={() => setShowPricingModal(false)} aria-label="Close pricing options"
+                style={{width:32,height:32,borderRadius:8,border:"1px solid var(--gray-200)",background:"#fff",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <X style={{width:16,height:16,color:"var(--gray-500)"}}/>
+              </button>
+            </div>
+            {/* Property context strip */}
+            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 24px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)",fontSize:13,color:"var(--gray-700)",fontWeight:500}}>
+              <span>{property.address}, {property.city} {property.state}</span>
+              <span>${property.price.toLocaleString()}</span>
+            </div>
+            {/* Plans */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,padding:24}}>
+              {/* Basic */}
+              <div style={{border:"1.5px solid var(--gray-200)",borderRadius:12,padding:20}}>
+                <p style={{fontSize:13,fontWeight:600,color:"var(--gray-500)",marginBottom:8}}>BASIC</p>
+                <p style={{fontSize:28,fontWeight:800,color:"var(--gray-900)",marginBottom:4}}>$29</p>
+                <p style={{fontSize:12,color:"var(--gray-400)",marginBottom:16}}>one-time per offer</p>
+                {["Full PDF offer package","State-specific purchase agreement","All required addendums","Professional cover letter"].map(f=>(
+                  <div key={f} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <CheckCircle style={{width:14,height:14,color:"var(--green)",flexShrink:0}}/>
+                    <span style={{fontSize:13,color:"var(--gray-700)"}}>{f}</span>
+                  </div>
+                ))}
+                <Link href={`/signup?plan=basic&property=${property.id}`}
+                  style={{display:"block",width:"100%",marginTop:20,padding:"12px",borderRadius:10,background:"var(--gray-900)",color:"#fff",textAlign:"center",fontSize:14,fontWeight:600,textDecoration:"none"}}>
+                  Choose Basic
+                </Link>
+              </div>
+              {/* Premium */}
+              <div style={{border:"2px solid var(--blue)",borderRadius:12,padding:20,position:"relative"}}>
+                <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:"var(--blue)",color:"#fff",fontSize:11,fontWeight:700,padding:"3px 12px",borderRadius:99}}>★ Popular</div>
+                <p style={{fontSize:13,fontWeight:600,color:"var(--blue)",marginBottom:8}}>PREMIUM</p>
+                <p style={{fontSize:28,fontWeight:800,color:"var(--gray-900)",marginBottom:4}}>$99</p>
+                <p style={{fontSize:12,color:"var(--gray-400)",marginBottom:16}}>one-time per offer</p>
+                {["Everything in Basic","Direct email to listing agent","Read receipt tracking","AI negotiation copilot","Unlimited revisions"].map(f=>(
+                  <div key={f} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <CheckCircle style={{width:14,height:14,color:"var(--blue)",flexShrink:0}}/>
+                    <span style={{fontSize:13,color:"var(--gray-700)"}}>{f}</span>
+                  </div>
+                ))}
+                <Link href={`/signup?plan=premium&property=${property.id}`}
+                  style={{display:"block",width:"100%",marginTop:20,padding:"12px",borderRadius:10,background:"var(--blue)",color:"#fff",textAlign:"center",fontSize:14,fontWeight:600,textDecoration:"none"}}>
+                  Choose Premium
+                </Link>
+              </div>
+            </div>
+            {/* Legal */}
+            <div className="warn-box" style={{margin:"0 24px 24px"}}>
+              <p style={{fontSize:12,color:"var(--gray-600)"}}>⚖️ HomeOfferDirect is not a law firm. We strongly recommend having a licensed real estate attorney review your offer before submitting.</p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -427,26 +497,44 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   if (step===1) return (
     <Q title="Which state is the property in?"
       subtitle="Each state uses different legal forms. We'll automatically load the correct ones.">
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+      <select
+        className="input-field"
+        value={d.state ?? ""}
+        onChange={e => set("state", e.target.value)}
+        style={{fontSize:15}}>
+        <option value="" disabled>Select a state...</option>
         {[
-          {v:"IL",label:"Illinois 🏙️",note:"CAR forms"},
-          {v:"TX",label:"Texas 🌵",note:"TREC forms"},
-          {v:"NY",label:"New York 🗽",note:"NYSBA forms"},
-          {v:"CA",label:"California ☀️",note:"CAR forms"},
-          {v:"FL",label:"Florida 🌴",note:"FAR forms"},
-        ].map(s=>(
-          <button key={s.v} onClick={()=>set("state",s.v)}
-            aria-pressed={d.state===s.v}
-            className={`option-card ${d.state===s.v?"selected":""}`}
-            style={{flexDirection:"column",alignItems:"flex-start",gap:4}}>
-            <span style={{fontSize:14,fontWeight:600,color:"var(--gray-900)"}}>{s.label}</span>
-            <span style={{fontSize:11,color:"var(--gray-500)"}}>{s.note}</span>
-            <div className="check" style={{position:"absolute" as const,top:12,right:12}}>
-              {d.state===s.v&&<CheckCircle style={{width:13,height:13,color:"#fff"}}/>}
-            </div>
-          </button>
-        ))}
-      </div>
+          {v:"AL",label:"Alabama"},{v:"AK",label:"Alaska"},{v:"AZ",label:"Arizona"},
+          {v:"AR",label:"Arkansas"},{v:"CA",label:"California"},{v:"CO",label:"Colorado"},
+          {v:"CT",label:"Connecticut"},{v:"DE",label:"Delaware"},{v:"FL",label:"Florida"},
+          {v:"GA",label:"Georgia"},{v:"HI",label:"Hawaii"},{v:"ID",label:"Idaho"},
+          {v:"IL",label:"Illinois"},{v:"IN",label:"Indiana"},{v:"IA",label:"Iowa"},
+          {v:"KS",label:"Kansas"},{v:"KY",label:"Kentucky"},{v:"LA",label:"Louisiana"},
+          {v:"ME",label:"Maine"},{v:"MD",label:"Maryland"},{v:"MA",label:"Massachusetts"},
+          {v:"MI",label:"Michigan"},{v:"MN",label:"Minnesota"},{v:"MS",label:"Mississippi"},
+          {v:"MO",label:"Missouri"},{v:"MT",label:"Montana"},{v:"NE",label:"Nebraska"},
+          {v:"NV",label:"Nevada"},{v:"NH",label:"New Hampshire"},{v:"NJ",label:"New Jersey"},
+          {v:"NM",label:"New Mexico"},{v:"NY",label:"New York"},{v:"NC",label:"North Carolina"},
+          {v:"ND",label:"North Dakota"},{v:"OH",label:"Ohio"},{v:"OK",label:"Oklahoma"},
+          {v:"OR",label:"Oregon"},{v:"PA",label:"Pennsylvania"},{v:"RI",label:"Rhode Island"},
+          {v:"SC",label:"South Carolina"},{v:"SD",label:"South Dakota"},{v:"TN",label:"Tennessee"},
+          {v:"TX",label:"Texas"},{v:"UT",label:"Utah"},{v:"VT",label:"Vermont"},
+          {v:"VA",label:"Virginia"},{v:"WA",label:"Washington"},{v:"WV",label:"West Virginia"},
+          {v:"WI",label:"Wisconsin"},{v:"WY",label:"Wyoming"},
+        ].map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
+      </select>
+      {d.state && (
+        <div className="helper-box" style={{marginTop:12}}>
+          <p style={{fontSize:13,color:"var(--gray-700)"}}>
+            {d.state === "IL" ? "Illinois CAR forms loaded — attorney review is standard in Illinois." :
+             d.state === "TX" ? "Texas TREC forms loaded — no attorney review required by law." :
+             d.state === "CA" ? "California CAR forms loaded." :
+             d.state === "NY" ? "New York NYSBA forms loaded — attorney review is standard in New York." :
+             d.state === "FL" ? "Florida FAR forms loaded." :
+             `${d.state} state forms loaded. Full state-specific guidance coming soon.`}
+          </p>
+        </div>
+      )}
     </Q>
   );
 
@@ -491,7 +579,14 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
             ["Beds / Baths", `${property.beds} bd · ${property.baths} ba · ${property.sqft.toLocaleString()} sqft`],
             ["Days on market", `${property.dom} days`],
             ["Listing agent", `${property.agent} · ${property.brokerage}`],
-            ["State forms", "Illinois Residential Purchase & Sale Agreement"],
+            ["State forms",
+              d.state === "IL" ? "Illinois Residential Purchase & Sale Agreement" :
+              d.state === "TX" ? "Texas TREC One to Four Family Residential Contract" :
+              d.state === "CA" ? "California Residential Purchase Agreement" :
+              d.state === "NY" ? "New York Standard Form Purchase Agreement" :
+              d.state === "FL" ? "Florida FAR/BAR As Is Residential Contract" :
+              `${d.state} Residential Purchase Agreement`
+            ],
           ].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
               <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>

@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
+import { Client } from "@upstash/qstash";
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
@@ -23,6 +24,25 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });
+
+  // Immediately enqueue a scrape job so the new search gets results right away.
+  // Fails silently when QStash is not configured (local dev).
+  const qstashToken = process.env.QSTASH_TOKEN;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (qstashToken && appUrl) {
+    const qstash = new Client({ token: qstashToken });
+    const workerUrl = `${appUrl}/api/queue/scrape-worker`;
+    await qstash.publishJSON({
+      url: workerUrl,
+      body: {
+        priceMin: data.price_min ?? undefined,
+        priceMax: data.price_max ?? undefined,
+        minBeds: data.min_beds ?? undefined,
+        propertyTypes: data.property_types?.length ? data.property_types : undefined,
+      },
+    }).catch(err => console.error("QStash publish failed:", err));
+  }
+
   return Response.json(data, { status: 201 });
 }
 

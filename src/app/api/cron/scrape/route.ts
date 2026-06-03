@@ -10,6 +10,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest } from "next/server";
+import { Client } from "@upstash/qstash";
 
 // ---------------------------------------------------------------------------
 // Redfin base URL (Chicago area — same params as existing scraper)
@@ -239,15 +240,32 @@ export async function GET(request: NextRequest) {
   }
   // If no active searches: fall through with all params undefined → broad scrape
 
-  // 5. Build Redfin URL
-  const redfinUrl = buildRedfinUrl({
+  // 5. Compute envelope filters for the job payload
+  const envelopeFilters = {
     priceMin,
     priceMax,
     minBeds,
     propertyTypes: allPropertyTypes.length > 0 ? allPropertyTypes : undefined,
-  });
+  };
 
-  // 6. Fetch and parse CSV
+  // 6. Dispatch to QStash worker if configured; otherwise scrape inline.
+  const qstashToken = process.env.QSTASH_TOKEN;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (qstashToken && appUrl) {
+    const qstash = new Client({ token: qstashToken });
+    await qstash.publishJSON({
+      url: `${appUrl}/api/queue/scrape-worker`,
+      body: envelopeFilters,
+    });
+    return Response.json({ queued: true, timestamp: new Date().toISOString() });
+  }
+
+  // --- Inline scrape fallback (no QStash configured) ---
+
+  // 6a. Build Redfin URL
+  const redfinUrl = buildRedfinUrl(envelopeFilters);
+
+  // 6b. Fetch and parse CSV
   let csvText: string;
   try {
     const response = await fetch(redfinUrl, {
@@ -282,7 +300,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 7. Filter and transform
+  // 6c. Filter and transform
   const properties = rows
     .filter((row) => {
       const state = (row["STATE OR PROVINCE"] ?? "").trim();
@@ -307,7 +325,7 @@ export async function GET(request: NextRequest) {
     }))
     .filter((p) => p.address !== "" && p.city !== "");
 
-  // 8. Upsert into properties table
+  // 6d. Upsert into properties table
   const { data: upserted, error: upsertError } = await supabase
     .from("properties")
     .upsert(properties, {
@@ -325,7 +343,7 @@ export async function GET(request: NextRequest) {
 
   const inserted = upserted?.length ?? properties.length;
 
-  // 9. Stamp last_scraped_at on all active saved_searches
+  // 6e. Stamp last_scraped_at on all active saved_searches
   if (activeSearches.length > 0) {
     const searchIds = activeSearches.map((s) => s.id);
     const { error: updateError } = await supabase

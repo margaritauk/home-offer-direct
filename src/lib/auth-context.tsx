@@ -226,13 +226,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw new Error(error.message);
       if (data.user) {
         // Insert the public profile row — best-effort, non-blocking
-        supabase.from("users").insert({
+        void supabase.from("users").insert({
           id: data.user.id,
           name: name.trim(),
           email: key,
           tier: "free",
           state,
-        }).then(() => {/* profile created */}).catch(() => {/* will be created on next login */});
+        });
         // onAuthStateChange will update the user state
       }
     } else {

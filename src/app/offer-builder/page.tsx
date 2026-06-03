@@ -23,14 +23,14 @@ type D = {
   buyerType:string; state:string; firstTime:boolean;
   propertyConfirmed:boolean;
   offerPrice:number;
-  financeType:string; downPct:number; preApproved:boolean;
+  financeType:string; downPct:number; preApproved:boolean|null;
   closingDays:number; earnestPct:number;
-  inspectionContingency:boolean; inspectionDays:number;
-  appraisalContingency:boolean;
-  financingContingency:boolean; financingDays:number;
-  escalation:boolean; escIncrement:number; escMax:number;
+  inspectionContingency:boolean|null; inspectionDays:number;
+  appraisalContingency:boolean|null;
+  financingContingency:boolean|null; financingDays:number;
+  escalation:boolean|null; escIncrement:number; escMax:number;
   sellerCredits:number;
-  personalLetter:boolean;
+  personalLetter:boolean|null;
 };
 
 const PROPERTY = { address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657",
@@ -43,17 +43,17 @@ export default function OfferBuilder() {
   const [step, setStep] = useState(0);
   const [showHelper, setShowHelper] = useState(false);
   const [d, setD] = useState<D>({
-    buyerType:"first", state:"IL", firstTime:true,
-    propertyConfirmed:true,
-    offerPrice:492000,
-    financeType:"conventional", downPct:20, preApproved:true,
-    closingDays:30, earnestPct:2,
-    inspectionContingency:true, inspectionDays:10,
-    appraisalContingency:true,
-    financingContingency:true, financingDays:21,
-    escalation:false, escIncrement:2500, escMax:510000,
-    sellerCredits:0,
-    personalLetter:false,
+    buyerType:"", state:"", firstTime:false,
+    propertyConfirmed:false,
+    offerPrice:0,
+    financeType:"", downPct:0, preApproved:null,
+    closingDays:0, earnestPct:0,
+    inspectionContingency:null, inspectionDays:0,
+    appraisalContingency:null,
+    financingContingency:null, financingDays:21,
+    escalation:null, escIncrement:2500, escMax:510000,
+    sellerCredits:-1,
+    personalLetter:null,
   });
 
   const set = <K extends keyof D>(k:K, v:D[K]) => setD(p=>({...p,[k]:v}));
@@ -275,19 +275,19 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       <OptionCard icon="✅" label="Yes, I'm pre-approved"
         desc="I have a letter from my lender ready to attach."
         badge="Strongest position"
-        selected={d.financeType!=="cash" && d.preApproved}
+        selected={d.financeType!=="cash" && d.preApproved===true}
         onClick={()=>{set("preApproved",true); set("financeType","conventional");}}/>
       <OptionCard icon="💵" label="I'm paying all cash"
         desc="No mortgage needed. This is the strongest possible offer."
         badge="Most competitive"
         selected={d.financeType==="cash"}
-        onClick={()=>{set("financeType","cash"); set("preApproved",false);}}/>
+        onClick={()=>{set("financeType","cash"); set("preApproved",null);}}/>
       <OptionCard icon="📄" label="No pre-approval yet"
         desc="I haven't started the mortgage process."
         warn={true}
-        selected={d.financeType!=="cash" && !d.preApproved}
+        selected={d.financeType!=="cash" && d.preApproved===false}
         onClick={()=>{set("preApproved",false); set("financeType","conventional");}}/>
-      {d.financeType!=="cash" && !d.preApproved && (
+      {d.financeType!=="cash" && d.preApproved===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e"}}>⚠️ <strong>Tip:</strong> Sellers often won't consider offers without pre-approval. We recommend getting one before submitting — it takes 24–48 hours online.</p>
         </div>
@@ -364,12 +364,12 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Or enter your own amount</label>
       <div style={{position:"relative"}}>
         <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"var(--gray-500)",fontSize:15}}>$</span>
-        <input type="number" value={d.offerPrice} onChange={e=>set("offerPrice",+e.target.value)}
+        <input type="number" value={d.offerPrice || ""} placeholder={String(PROPERTY.price)} onChange={e=>set("offerPrice",+e.target.value)}
           className="input-field" style={{paddingLeft:28}}/>
       </div>
 
       {/* Strength bar */}
-      <div style={{marginTop:16,padding:"14px 16px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)"}}>
+      {d.offerPrice > 0 && <div style={{marginTop:16,padding:"14px 16px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)"}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8}}>
           <span style={{color:"var(--gray-600)"}}>Offer strength vs. asking price</span>
           <span style={{fontWeight:700,color:d.offerPrice>=PROPERTY.price?"var(--green)":"var(--amber)"}}>
@@ -383,7 +383,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
             borderRadius:3,transition:"width .4s",
             width:`${Math.min(100,Math.max(5,50+(d.offerPrice-PROPERTY.price)/PROPERTY.price*300))}%`}}/>
         </div>
-      </div>
+      </div>}
     </Q>
   );
 
@@ -513,18 +513,18 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       showHelper={showHelper} toggleHelper={toggleHelper}>
       <OptionCard icon="🔍" label="Yes — include inspection contingency"
         desc="I want 10 days to inspect the home. Most buyers choose this." badge="Recommended"
-        selected={d.inspectionContingency && d.inspectionDays===10}
+        selected={d.inspectionContingency===true && d.inspectionDays===10}
         onClick={()=>{set("inspectionContingency",true); set("inspectionDays",10);}}/>
       <OptionCard icon="⚡" label="Yes — shorter 7-day inspection window"
         desc="Shows urgency. Useful in very competitive markets."
-        selected={d.inspectionContingency && d.inspectionDays===7}
+        selected={d.inspectionContingency===true && d.inspectionDays===7}
         onClick={()=>{set("inspectionContingency",true); set("inspectionDays",7);}}/>
       <OptionCard icon="🚫" label="No — waive the inspection contingency"
         desc="Strongest offer — but you accept the home in its current condition."
         warn={true}
-        selected={!d.inspectionContingency}
+        selected={d.inspectionContingency===false}
         onClick={()=>set("inspectionContingency",false)}/>
-      {!d.inspectionContingency && (
+      {d.inspectionContingency===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ <strong>High risk:</strong> Without an inspection, you could be responsible for costly hidden defects — HVAC failures, foundation issues, roof damage, etc. We strongly advise against this unless you're very familiar with the property.</p>
         </div>
@@ -540,14 +540,14 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       showHelper={showHelper} toggleHelper={toggleHelper}>
       <OptionCard icon="📊" label="Yes — include appraisal contingency"
         desc="I'm protected if the home appraises below my offer price." badge="Recommended"
-        selected={d.appraisalContingency}
+        selected={d.appraisalContingency===true}
         onClick={()=>set("appraisalContingency",true)}/>
       <OptionCard icon="💪" label="No — waive appraisal contingency"
         desc="Stronger offer — but I must cover any gap between appraised value and offer price."
         warn={true}
-        selected={!d.appraisalContingency}
+        selected={d.appraisalContingency===false}
         onClick={()=>set("appraisalContingency",false)}/>
-      {!d.appraisalContingency && (
+      {d.appraisalContingency===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ You offered {fmt(d.offerPrice)} ({fmt(d.offerPrice-PROPERTY.price)} above asking). If the home appraises at asking price, you'd need an extra <strong>{fmt(d.offerPrice-PROPERTY.price)} in cash at closing</strong>.</p>
         </div>
@@ -566,14 +566,14 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
         : <>
           <OptionCard icon="🛡️" label="Yes — include financing contingency"
             desc="I'm protected if I can't get my mortgage approved within 21 days." badge="Recommended"
-            selected={d.financingContingency}
+            selected={d.financingContingency===true}
             onClick={()=>set("financingContingency",true)}/>
           <OptionCard icon="⚡" label="No — waive financing contingency"
             desc="Stronger offer but I risk losing my earnest money if my loan is denied."
             warn={true}
-            selected={!d.financingContingency}
+            selected={d.financingContingency===false}
             onClick={()=>set("financingContingency",false)}/>
-          {!d.financingContingency && (
+          {d.financingContingency===false && (
             <div className="warn-box" style={{marginTop:8}}>
               <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ If your mortgage is denied, you could lose your {fmt(Math.round(d.offerPrice*d.earnestPct/100))} earnest money deposit. Only waive this if you're extremely confident in your financing.</p>
             </div>
@@ -590,13 +590,13 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       showHelper={showHelper} toggleHelper={toggleHelper}>
       <OptionCard icon="📈" label="Yes — add an escalation clause"
         desc="Automatically beat competing offers up to my maximum. Smart in competitive markets."
-        selected={d.escalation}
+        selected={d.escalation===true}
         onClick={()=>set("escalation",true)}/>
       <OptionCard icon="📋" label="No — my offer is firm"
         desc="I'll submit my best price and not escalate."
-        selected={!d.escalation}
+        selected={d.escalation===false}
         onClick={()=>set("escalation",false)}/>
-      {d.escalation && (
+      {d.escalation===true && (
         <div className="card-sm" style={{padding:"16px 20px",marginTop:12,border:"1.5px solid #bfdbfe"}}>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
             <div>
@@ -660,13 +660,13 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       helper="Some sellers care deeply about who buys their home, especially if they've lived there for many years. A short, personal letter explaining who you are and why you love the home can create an emotional connection. Note: In some states, personal letters are discouraged to avoid fair housing issues — check with your attorney.">
       <OptionCard icon="✉️" label="Yes — add a personal letter"
         desc="I'll write a brief note about myself and why I love this home."
-        selected={d.personalLetter}
+        selected={d.personalLetter===true}
         onClick={()=>set("personalLetter",true)}/>
       <OptionCard icon="📋" label="No — keep it business only"
         desc="Let the numbers speak. Clean, professional offer package."
-        selected={!d.personalLetter}
+        selected={d.personalLetter===false}
         onClick={()=>set("personalLetter",false)}/>
-      {d.personalLetter && (
+      {d.personalLetter===true && (
         <div style={{marginTop:12}}>
           <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Your personal letter</label>
           <textarea rows={5} className="input-field" placeholder="Dear Seller, We are a family of four who fell in love with your home the moment we walked through the door..."

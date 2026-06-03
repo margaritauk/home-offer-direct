@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { sha256 } from "@/lib/hash";
 
 export type Tier = "free" | "basic" | "premium" | "pro";
 
@@ -104,8 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check registered users
     const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
     const stored = users[key];
-    if (stored && stored.password === password) {
-      const { password: _, ...u } = stored;
+    const hash = await sha256(password);
+    if (stored && stored.passwordHash === hash) {
+      const { passwordHash: _, ...u } = stored;
       persist(u as AuthUser);
       return;
     }
@@ -117,8 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (TEST_ACCOUNTS[key]) throw new Error("This email is reserved for testing");
     const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
     if (users[key]) throw new Error("An account with this email already exists");
+    const passwordHash = await sha256(password);
     const newUser: AuthUser = {
-      id: `u-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: name.trim(),
       email: key,
       tier: "free",
@@ -126,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       offers: [],
       savedHomeIds: [],
     };
-    users[key] = { ...newUser, password };
+    users[key] = { ...newUser, passwordHash };
     localStorage.setItem("hod_users", JSON.stringify(users));
     persist(newUser);
   };

@@ -3,8 +3,6 @@ export const runtime = "nodejs";
 import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import type React from "react";
-import ReactPDF, { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { OfferSummaryPdf } from "@/components/pdf/OfferSummaryPdf";
 import type { OfferRow, PropertyRow } from "@/components/pdf/OfferSummaryPdf";
@@ -68,11 +66,13 @@ export async function GET(
   }
 
   /* ── Render PDF ── */
-  const element = createElement(
-    OfferSummaryPdf,
-    { offer, property },
-  ) as React.ReactElement<ReactPDF.DocumentProps>;
-  const pdfBuffer = await renderToBuffer(element);
+  // Cast needed: createElement returns FunctionComponentElement but renderToBuffer
+  // expects ReactElement<DocumentProps>. The runtime shape is compatible.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const { renderToBuffer } = require("@react-pdf/renderer") as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const element = createElement(OfferSummaryPdf, { offer, property }) as any;
+  const pdfBuffer: Buffer = await renderToBuffer(element);
 
   /* ── Upload to Supabase Storage ── */
   const storagePath = `offer-pdfs/${user.id}/${id}.pdf`;
@@ -99,7 +99,7 @@ export async function GET(
   // Non-fatal: return PDF even if storage upload fails
 
   /* ── Stream PDF to client ── */
-  return new Response(pdfBuffer, {
+  return new Response(pdfBuffer as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

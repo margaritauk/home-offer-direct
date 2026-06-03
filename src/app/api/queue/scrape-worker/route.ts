@@ -13,8 +13,8 @@
  */
 
 import { Receiver } from "@upstash/qstash";
-import { scrapeAndUpsert } from "../../../../scripts/scrape-listings";
-import type { ScrapeFilters } from "../../../../scripts/scrape-listings";
+import { scrapeAndUpsert } from "../../../../../scripts/scrape-listings";
+import type { ScrapeFilters } from "../../../../../scripts/scrape-listings";
 
 export async function POST(request: Request) {
   const receiver = new Receiver({

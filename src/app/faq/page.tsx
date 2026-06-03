@@ -33,13 +33,20 @@ export default function FAQPage() {
               <div key={i} className="border border-gray-100 rounded-xl overflow-hidden">
                 <button
                   className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition-colors"
-                  onClick={() => setOpen(open === i ? null : i)}>
+                  onClick={() => setOpen(open === i ? null : i)}
+                  aria-expanded={open === i}
+                  aria-controls={`faq-panel-${i}`}
+                  id={`faq-button-${i}`}>
                   <span className="font-medium text-gray-900 text-sm pr-4">{faq.q}</span>
                   {open === i
                     ? <ChevronUp className="w-4 h-4 text-blue-500 flex-shrink-0"/>
                     : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0"/>}
                 </button>
-                <div className={`overflow-hidden transition-all duration-200 ease-out ${open === i ? "max-h-96" : "max-h-0"}`}>
+                <div
+                  id={`faq-panel-${i}`}
+                  role="region"
+                  aria-labelledby={`faq-button-${i}`}
+                  className={`overflow-hidden transition-all duration-200 ease-out ${open === i ? "max-h-96" : "max-h-0"}`}>
                   <div className="px-5 pb-4 pt-1 border-t border-gray-50">
                     <p className="text-sm text-gray-600 leading-relaxed">{faq.a}</p>
                   </div>

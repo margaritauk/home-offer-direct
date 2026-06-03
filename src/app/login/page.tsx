@@ -2,7 +2,7 @@
 import { useState, FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Home, Eye, EyeOff, AlertCircle, ArrowRight } from "lucide-react";
+import { Home, Eye, EyeOff, AlertCircle, ArrowRight, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const TEST_ACCOUNTS = [
@@ -125,26 +125,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-slate-100" />
-            <span className="text-xs text-slate-400 font-medium">or</span>
-            <div className="flex-1 h-px bg-slate-100" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label: "Google", logo: "G" },
-              { label: "Apple",  logo: "⌘" },
-            ].map((p) => (
-              <button
-                key={p.label}
-                onClick={() => setError(`${p.label} Sign-In requires OAuth credentials in .env`)}
-                className="flex items-center justify-center gap-2 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all"
-              >
-                <span className="font-bold text-base">{p.logo}</span>
-                {p.label}
-              </button>
-            ))}
+          <div style={{marginTop:20,padding:"12px 14px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)",display:"flex",gap:10,alignItems:"flex-start"}}>
+            <Lock style={{width:16,height:16,color:"var(--gray-500)",flexShrink:0,marginTop:1}}/>
+            <div>
+              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is encrypted and never sold.</p>
+              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>We use 256-bit SSL. Payment is handled by Stripe — we never store card numbers.</p>
+            </div>
           </div>
 
           {/* Test accounts */}

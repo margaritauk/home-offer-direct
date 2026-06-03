@@ -273,7 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("name, tier, state")
           .eq("id", sbUser.id)
           .single();
-        setUser(supabaseUserToAuthUser(sbUser, profile ?? undefined));
+        const offers = await fetchUserOffers(supabase, sbUser.id);
+        setUser(supabaseUserToAuthUser(sbUser, profile ?? undefined, offers));
       }
     } else {
       const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");

@@ -56,7 +56,7 @@ export default function LoginPage() {
           <p className="text-[15px] text-slate-500 mb-8">Sign in to continue your offers</p>
 
           {error && (
-            <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-xl px-4 py-3.5 mb-6">
+            <div role="alert" className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-xl px-4 py-3.5 mb-6">
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
               <span className="text-sm text-red-700">{error}</span>
             </div>
@@ -64,21 +64,23 @@ export default function LoginPage() {
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+              <label htmlFor="login-email" className="block text-sm font-medium text-slate-700 mb-2">Email</label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@email.com"
                 required
                 autoComplete="email"
+                inputMode="email"
                 className="w-full px-4 py-3 border border-slate-200 rounded-xl text-[15px] text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-slate-700">Password</label>
+                <label htmlFor="login-password" className="text-sm font-medium text-slate-700">Password</label>
                 {forgotSent ? (
                   <span className="text-xs text-green-600 font-medium">Email hello@homeofferdirect.org</span>
                 ) : (
@@ -90,19 +92,21 @@ export default function LoginPage() {
               </div>
               <div className="relative">
                 <input
+                  id="login-password"
                   type={showPass ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   required
                   autoComplete="current-password"
-                  className="w-full px-4 py-3 pr-11 border border-slate-200 rounded-xl text-[15px] text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 pr-12 border border-slate-200 rounded-xl text-[15px] text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPass((s) => !s)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  tabIndex={-1}
+                  aria-label={showPass ? "Hide password" : "Show password"}
+                  aria-pressed={showPass}
+                  className="absolute right-0 top-0 h-full px-3 flex items-center text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:rounded-r-xl transition-colors"
                 >
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -125,30 +129,32 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div style={{marginTop:20,padding:"12px 14px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)",display:"flex",gap:10,alignItems:"flex-start"}}>
-            <Lock style={{width:16,height:16,color:"var(--gray-500)",flexShrink:0,marginTop:1}}/>
+          <div className="mt-5 flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3">
+            <Lock className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is private and never sold.</p>
-              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>Passwords are hashed before storage. We will never sell your personal information.</p>
+              <p className="text-xs font-semibold text-slate-700 mb-0.5">Your data is private and never sold.</p>
+              <p className="text-xs text-slate-500 leading-relaxed">Passwords are hashed before storage. We will never sell your personal information.</p>
             </div>
           </div>
 
-          {/* Test accounts */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <p className="text-xs font-semibold text-blue-700 mb-2.5">Demo accounts — password: test123</p>
-            <div className="space-y-1.5">
-              {TEST_ACCOUNTS.map((a) => (
-                <button
-                  key={a.email}
-                  onClick={() => { setEmail(a.email); setPassword("test123"); setError(""); }}
-                  className="block text-left w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-0.5"
-                >
-                  {a.email}
-                  <span className="text-blue-400 ml-1">· {a.label}</span>
-                </button>
-              ))}
+          {/* Test accounts — dev/staging only */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100">
+              <p className="text-xs font-semibold text-blue-700 mb-2.5">Demo accounts — password: test123</p>
+              <div className="space-y-1.5">
+                {TEST_ACCOUNTS.map((a) => (
+                  <button
+                    key={a.email}
+                    onClick={() => { setEmail(a.email); setPassword("test123"); setError(""); }}
+                    className="block text-left w-full text-xs text-blue-600 hover:text-blue-800 hover:underline py-0.5 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:rounded"
+                  >
+                    {a.email}
+                    <span className="text-blue-400 ml-1">· {a.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <p className="text-center mt-6 text-sm text-slate-500">

@@ -3,7 +3,7 @@ import { useState, FormEvent, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
-import { Home, Mail, Lock, User, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
+import { Home, Mail, Lock, User, ArrowRight, CheckCircle, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
 const benefits = [
@@ -31,6 +31,7 @@ function SignupContent() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [state, setState] = useState("");
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +46,7 @@ function SignupContent() {
     try {
       await register(name, email, password, state || "IL");
       localStorage.setItem("hod-new-user", "1");
-      router.push("/search?welcome=1");
+      router.push(planParam ? `/checkout?plan=${planParam}` : "/search?welcome=1");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -109,7 +110,7 @@ function SignupContent() {
           {selectedPlanLabel && (
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-3 mb-5">
               <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
-              <span className="text-sm text-blue-700">You selected <strong>{selectedPlanLabel}</strong> — complete signup to continue</span>
+              <span className="text-sm text-blue-700">You selected <strong>{selectedPlanLabel}</strong> — you&apos;ll be taken to checkout after creating your account</span>
             </div>
           )}
 
@@ -136,13 +137,28 @@ function SignupContent() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+              <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                  placeholder="Min. 8 characters" required autoComplete="new-password"
-                  aria-invalid={!!error}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+                <input
+                  id="signup-password"
+                  type={showPass ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Min. 8 characters"
+                  required
+                  autoComplete="new-password"
+                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(s => !s)}
+                  aria-label={showPass ? "Hide password" : "Show password"}
+                  aria-pressed={showPass}
+                  className="absolute right-0 top-0 h-full px-3 flex items-center text-slate-400 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:rounded-r-xl transition-colors"
+                >
+                  {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
@@ -169,15 +185,22 @@ function SignupContent() {
 
             <button type="submit" disabled={loading}
               className="w-full flex items-center justify-center gap-2 gradient-bg text-white font-semibold py-3.5 rounded-xl hover:opacity-90 transition-all shadow-sm disabled:opacity-60">
-              {loading ? "Creating account…" : <><span>Create Free Account</span><ArrowRight className="w-4 h-4"/></>}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Creating account…
+                </span>
+              ) : (
+                <><span>Create Free Account</span><ArrowRight className="w-4 h-4"/></>
+              )}
             </button>
           </form>
 
-          <div style={{marginTop:20,padding:"12px 14px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)",display:"flex",gap:10,alignItems:"flex-start"}}>
-            <Lock style={{width:16,height:16,color:"var(--gray-500)",flexShrink:0,marginTop:1}}/>
+          <div className="mt-5 flex items-start gap-2.5 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3">
+            <Lock className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is private and never sold.</p>
-              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>Passwords are hashed before storage. We will never sell your personal information.</p>
+              <p className="text-xs font-semibold text-slate-700 mb-0.5">Your data is private and never sold.</p>
+              <p className="text-xs text-slate-500 leading-relaxed">Passwords are hashed before storage. We will never sell your personal information.</p>
             </div>
           </div>
 

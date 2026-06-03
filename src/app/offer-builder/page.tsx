@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
 import { track } from "@/lib/analytics";
+import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
+import type { Property } from "@/lib/properties";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -37,22 +39,8 @@ type D = {
 };
 
 /* ─────────────────────────────────────────────────
-   PROPERTIES
+   PROPERTIES — imported from @/lib/properties
 ───────────────────────────────────────────────── */
-type Property = {
-  id: string; address: string; city: string; state: string; zip: string;
-  price: number; beds: number; baths: number; sqft: number; dom: number;
-  agent: string; brokerage: string; img: string;
-};
-
-const PROPERTIES: Property[] = [
-  { id:"1", address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657", price:485000, beds:3, baths:2, sqft:1850, dom:12, agent:"Sarah Johnson", brokerage:"Coldwell Banker", img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop" },
-  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago", state:"IL", zip:"60614", price:625000, beds:4, baths:2.5, sqft:2400, dom:5, agent:"Linda Park", brokerage:"Baird & Warner", img:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&auto=format&fit=crop" },
-  { id:"3", address:"4521 N Ashland Ave", city:"Chicago", state:"IL", zip:"60640", price:359000, beds:2, baths:1, sqft:1200, dom:28, agent:"Mike Torres", brokerage:"RE/MAX", img:"https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop" },
-  { id:"4", address:"3102 W Belmont Ave", city:"Chicago", state:"IL", zip:"60618", price:549000, beds:3, baths:2, sqft:2100, dom:3, agent:"Donna Keller", brokerage:"Compass", img:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&auto=format&fit=crop" },
-  { id:"5", address:"7845 S Cottage Grove Ave", city:"Chicago", state:"IL", zip:"60619", price:229000, beds:3, baths:1.5, sqft:1600, dom:45, agent:"James Wu", brokerage:"@properties", img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&auto=format&fit=crop" },
-  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", zip:"60614", price:795000, beds:4, baths:3, sqft:3200, dom:8, agent:"Rachel Bloom", brokerage:"Sotheby's", img:"https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&auto=format&fit=crop" },
-];
 
 const fmt = (n:number) => "$"+n.toLocaleString();
 

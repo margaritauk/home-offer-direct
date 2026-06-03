@@ -6,20 +6,13 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth, useTierFeatures } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
+import { ALL_PROPERTIES } from "@/lib/properties";
+import type { Property } from "@/lib/properties";
 import {
   Search, SlidersHorizontal, MapPin, Bed, Bath, Square,
   Heart, TrendingDown, TrendingUp, Sparkles, ChevronDown, Filter,
   Phone, Mail,
 } from "lucide-react";
-
-const sampleProperties = [
-  { id:"1", address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657", price:485000, beds:3, baths:2, sqft:1850, type:"Single Family", dom:12, priceHistory:"reduced", priceChange:-15000, photos:["https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=800"], aiScore:87, aiLabel:"Great Value", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[475000,492000], marketTrend:"hot", listingAgent:"Sarah Johnson", agentPhone:"(312) 555-0192", agentEmail:"sarah.johnson@coldwellbanker.com", brokerage:"Coldwell Banker" },
-  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago", state:"IL", zip:"60614", price:625000, beds:4, baths:2.5, sqft:2400, type:"Townhouse", dom:5, priceHistory:"same", priceChange:0, photos:["https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=800"], aiScore:72, aiLabel:"Competitive", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[618000,635000], marketTrend:"hot", listingAgent:"Linda Park", agentPhone:"(312) 555-0341", agentEmail:"lpark@bairdwarner.com", brokerage:"Baird & Warner" },
-  { id:"3", address:"4521 N Ashland Ave", city:"Chicago", state:"IL", zip:"60640", price:359000, beds:2, baths:1, sqft:1200, type:"Condo", dom:28, priceHistory:"reduced", priceChange:-20000, photos:["https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800"], aiScore:91, aiLabel:"Best Deal", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[345000,360000], marketTrend:"cooling", listingAgent:"Mike Torres", agentPhone:"(312) 555-0847", agentEmail:"m.torres@remax.com", brokerage:"RE/MAX" },
-  { id:"4", address:"3102 W Belmont Ave", city:"Chicago", state:"IL", zip:"60618", price:549000, beds:3, baths:2, sqft:2100, type:"Single Family", dom:3, priceHistory:"increased", priceChange:10000, photos:["https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800"], aiScore:65, aiLabel:"Act Fast", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[545000,565000], marketTrend:"hot", listingAgent:"Donna Keller", agentPhone:"(312) 555-0223", agentEmail:"d.keller@compass.com", brokerage:"Compass" },
-  { id:"5", address:"7845 S Cottage Grove Ave", city:"Chicago", state:"IL", zip:"60619", price:229000, beds:3, baths:1.5, sqft:1600, type:"Single Family", dom:45, priceHistory:"reduced", priceChange:-25000, photos:["https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800"], aiScore:95, aiLabel:"Negotiate!", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[210000,225000], marketTrend:"cooling", listingAgent:"James Wu", agentPhone:"(312) 555-0519", agentEmail:"j.wu@atproperties.com", brokerage:"@properties" },
-  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", zip:"60614", price:795000, beds:4, baths:3, sqft:3200, type:"Single Family", dom:8, priceHistory:"same", priceChange:0, photos:["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800"], aiScore:78, aiLabel:"Well-Priced", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[785000,810000], marketTrend:"hot", listingAgent:"Rachel Bloom", agentPhone:"(312) 555-0761", agentEmail:"r.bloom@sothebys.com", brokerage:"Sotheby's" },
-];
 
 function SearchContent() {
   const router = useRouter();
@@ -38,7 +31,7 @@ function SearchContent() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const filteredProperties = sampleProperties.filter(p => {
+  const filteredProperties = ALL_PROPERTIES.filter(p => {
     const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
     const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
     if (p.price < min || p.price > max) return false;
@@ -173,16 +166,8 @@ export default function SearchPage() {
   );
 }
 
-interface Property {
-  id: string; address: string; city: string; state: string; zip: string;
-  price: number; beds: number; baths: number; sqft: number; type: string;
-  dom: number; priceHistory: string; priceChange: number; photos: string[];
-  aiScore: number; aiLabel: string; aiColor: string; suggestedOffer: number[];
-  marketTrend: string; listingAgent: string; agentPhone: string; agentEmail: string; brokerage: string;
-}
-
 function PropertyCard({ property, saved, onToggleSave }: { property: Property; saved: boolean; onToggleSave: () => void }) {
-  const showingMailto = `mailto:${property.agentEmail}?subject=Showing request — ${property.address}&body=Hi ${property.listingAgent.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${property.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`;
+  const showingMailto = `mailto:${property.agentEmail}?subject=Showing request — ${property.address}&body=Hi ${property.agentName.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${property.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`;
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group">
@@ -250,7 +235,7 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
         {/* Agent contact */}
         <div className="border-t border-slate-100 pt-3">
           <p className="text-xs text-slate-400 mb-2">
-            Listing agent: <span className="text-slate-600 font-medium">{property.listingAgent}</span>
+            Listing agent: <span className="text-slate-600 font-medium">{property.agentName}</span>
             <span className="text-slate-300 mx-1">·</span>
             <span>{property.brokerage}</span>
           </p>

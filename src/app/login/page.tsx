@@ -128,8 +128,8 @@ export default function LoginPage() {
           <div style={{marginTop:20,padding:"12px 14px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)",display:"flex",gap:10,alignItems:"flex-start"}}>
             <Lock style={{width:16,height:16,color:"var(--gray-500)",flexShrink:0,marginTop:1}}/>
             <div>
-              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is encrypted and never sold.</p>
-              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>We use 256-bit SSL. Payment is handled by Stripe — we never store card numbers.</p>
+              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is private and never sold.</p>
+              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>Passwords are hashed before storage. We will never sell your personal information.</p>
             </div>
           </div>
 

@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { sha256 } from "@/lib/hash";
 
 export type Tier = "free" | "basic" | "premium" | "pro";
 
@@ -78,74 +79,210 @@ const TEST_ACCOUNTS: Record<string, AuthUser> = {
 const AuthContext = createContext<AuthContextType | null>(null);
 const STORAGE_KEY = "hod_user";
 
+const SUPABASE_CONFIGURED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/* ── Supabase path ──────────────────────────────────────────────────── */
+
+async function getSupabaseClient() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
+
+function supabaseUserToAuthUser(sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }, profile?: { name?: string; tier?: string; state?: string }): AuthUser {
+  return {
+    id: sbUser.id,
+    name: (profile?.name as string) ?? (sbUser.user_metadata?.name as string) ?? sbUser.email ?? "User",
+    email: sbUser.email ?? "",
+    tier: ((profile?.tier as Tier) ?? "free"),
+    state: (profile?.state as string) ?? "IL",
+    offers: [],
+    savedHomeIds: [],
+  };
+}
+
+/* ── Provider ───────────────────────────────────────────────────────── */
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /* ── Initialise session ─────────────────────────────────────────── */
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setUser(JSON.parse(stored));
-    } catch { /* ignore */ }
-    setLoading(false);
+    if (SUPABASE_CONFIGURED) {
+      // Supabase path: subscribe to auth state changes
+      let unsubscribe: (() => void) | undefined;
+
+      getSupabaseClient().then((supabase) => {
+        // Bootstrap from current session
+        supabase.auth.getUser().then(async ({ data }) => {
+          if (data.user) {
+            const { data: profile } = await supabase
+              .from("users")
+              .select("name, tier, state")
+              .eq("id", data.user.id)
+              .single();
+            setUser(supabaseUserToAuthUser(data.user, profile ?? undefined));
+          }
+          setLoading(false);
+        });
+
+        // Keep in sync with auth state changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (session?.user) {
+              const { data: profile } = await supabase
+                .from("users")
+                .select("name, tier, state")
+                .eq("id", session.user.id)
+                .single();
+              setUser(supabaseUserToAuthUser(session.user, profile ?? undefined));
+            } else {
+              setUser(null);
+            }
+            setLoading(false);
+          }
+        );
+        unsubscribe = () => subscription.unsubscribe();
+      });
+
+      return () => { unsubscribe?.(); };
+    } else {
+      // localStorage fallback
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) setUser(JSON.parse(stored));
+      } catch { /* ignore */ }
+      setLoading(false);
+    }
   }, []);
 
+  /* ── localStorage helpers (fallback path only) ─────────────────── */
   const persist = (u: AuthUser | null) => {
     setUser(u);
     if (u) localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
     else localStorage.removeItem(STORAGE_KEY);
   };
 
+  /* ── login ──────────────────────────────────────────────────────── */
   const login = async (email: string, password: string) => {
     const key = email.toLowerCase().trim();
-    // Check test accounts
+
+    // Test accounts work in both paths
     const test = TEST_ACCOUNTS[key];
-    if (test && password === "test123") { persist(test); return; }
-    // Check registered users
-    const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
-    const stored = users[key];
-    if (stored && stored.password === password) {
-      const { password: _, ...u } = stored;
-      persist(u as AuthUser);
+    if (test && password === "test123") {
+      if (!SUPABASE_CONFIGURED) persist(test);
+      else setUser(test);
       return;
     }
-    throw new Error("Invalid email or password");
+
+    if (SUPABASE_CONFIGURED) {
+      const supabase = await getSupabaseClient();
+      const { error } = await supabase.auth.signInWithPassword({ email: key, password });
+      if (error) throw new Error(error.message);
+      // onAuthStateChange will update the user state
+    } else {
+      const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
+      const stored = users[key];
+      const hash = await sha256(password);
+      if (stored && stored.passwordHash === hash) {
+        const { passwordHash: _, ...u } = stored;
+        persist(u as AuthUser);
+        return;
+      }
+      throw new Error("Invalid email or password");
+    }
   };
 
+  /* ── register ───────────────────────────────────────────────────── */
   const register = async (name: string, email: string, password: string, state: string) => {
     const key = email.toLowerCase().trim();
     if (TEST_ACCOUNTS[key]) throw new Error("This email is reserved for testing");
-    const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
-    if (users[key]) throw new Error("An account with this email already exists");
-    const newUser: AuthUser = {
-      id: `u-${Date.now()}`,
-      name: name.trim(),
-      email: key,
-      tier: "free",
-      state,
-      offers: [],
-      savedHomeIds: [],
-    };
-    users[key] = { ...newUser, password };
-    localStorage.setItem("hod_users", JSON.stringify(users));
-    persist(newUser);
+
+    if (SUPABASE_CONFIGURED) {
+      const supabase = await getSupabaseClient();
+      const { data, error } = await supabase.auth.signUp({
+        email: key,
+        password,
+        options: { data: { name: name.trim() } },
+      });
+      if (error) throw new Error(error.message);
+      if (data.user) {
+        // Insert the public profile row
+        await supabase.from("users").insert({
+          id: data.user.id,
+          name: name.trim(),
+          email: key,
+          tier: "free",
+          state,
+        });
+        // onAuthStateChange will update the user state
+      }
+    } else {
+      const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
+      if (users[key]) throw new Error("An account with this email already exists");
+      const passwordHash = await sha256(password);
+      const newUser: AuthUser = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        email: key,
+        tier: "free",
+        state,
+        offers: [],
+        savedHomeIds: [],
+      };
+      users[key] = { ...newUser, passwordHash };
+      localStorage.setItem("hod_users", JSON.stringify(users));
+      persist(newUser);
+    }
+
+    // Fire-and-forget welcome email (both paths)
+    fetch("/api/auth/welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: key, name: name.trim() }),
+    }).catch(() => { /* ignore email failures */ });
   };
 
-  const logout = () => persist(null);
+  /* ── logout ─────────────────────────────────────────────────────── */
+  const logout = async () => {
+    if (SUPABASE_CONFIGURED) {
+      const supabase = await getSupabaseClient();
+      await supabase.auth.signOut();
+      // onAuthStateChange will set user to null
+    } else {
+      persist(null);
+    }
+  };
 
+  /* ── tier / saved homes (localStorage path; Supabase path would use DB) */
   const setUserTier = (tier: Tier) => {
     if (!user) return;
-    persist({ ...user, tier });
+    const updated = { ...user, tier };
+    setUser(updated);
+    if (!SUPABASE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   };
 
   const saveHome = (homeId: string) => {
     if (!user) return;
-    persist({ ...user, savedHomeIds: [...new Set([...user.savedHomeIds, homeId])] });
+    const updated = { ...user, savedHomeIds: [...new Set([...user.savedHomeIds, homeId])] };
+    setUser(updated);
+    if (!SUPABASE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   };
 
   const unsaveHome = (homeId: string) => {
     if (!user) return;
-    persist({ ...user, savedHomeIds: user.savedHomeIds.filter(id => id !== homeId) });
+    const updated = { ...user, savedHomeIds: user.savedHomeIds.filter(id => id !== homeId) };
+    setUser(updated);
+    if (!SUPABASE_CONFIGURED) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   };
 
   return (

@@ -392,15 +392,12 @@ function OfferBuilderInner() {
     if (SUPABASE_ENABLED && user) {
       setIsSubmitting(true);
       try {
-        const supabase = await getSupabaseClient();
         const offerId = supabaseOfferId.current;
         if (offerId) {
-          const { error } = await supabase
-            .from("offers")
-            .update({ status: "submitted", updated_at: new Date().toISOString() })
-            .eq("id", offerId);
-          if (error) {
-            console.error("offer-builder: failed to submit offer", error);
+          const res = await fetch(`/api/offers/${offerId}/submit`, { method: "POST" });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            console.error("offer-builder: failed to submit offer", body);
             setSubmitError("Failed to submit offer — please try again");
             setIsSubmitting(false);
             return;

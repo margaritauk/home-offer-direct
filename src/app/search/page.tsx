@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
@@ -11,7 +11,7 @@ import type { Property } from "@/lib/properties";
 import {
   Search, SlidersHorizontal, MapPin, Bed, Bath, Square,
   Heart, TrendingDown, TrendingUp, Sparkles, ChevronDown, Filter,
-  Phone, Mail,
+  Phone, Mail, Bookmark,
 } from "lucide-react";
 
 /* ── Supabase DB row shape (only columns that exist in the schema) ──── */
@@ -95,6 +95,13 @@ function SearchContent() {
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
+
+  // Save Search popover state
+  const [showSavePopover, setShowSavePopover] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saveBanner, setSaveBanner] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   // Properties state — starts with mock data, replaced by DB data when available
   const [properties, setProperties] = useState<Property[]>(ALL_PROPERTIES);

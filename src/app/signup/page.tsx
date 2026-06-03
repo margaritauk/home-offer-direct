@@ -46,11 +46,11 @@ function SignupContent() {
     try {
       await register(name, email, password, state || "IL");
       localStorage.setItem("hod-new-user", "1");
+      setLoading(false);
       router.push(planParam ? `/checkout?plan=${planParam}` : "/search?welcome=1");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
       setLoading(false);
+      setError(err instanceof Error ? err.message : "Registration failed");
     }
   };
 
@@ -118,28 +118,28 @@ function SignupContent() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Full name</label>
               <div className="relative">
-                <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <input type="text" value={name} onChange={e => setName(e.target.value)}
                   placeholder="Jane Smith" required autoComplete="name"
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Email address</label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="jane@email.com" required autoComplete="email"
                   aria-invalid={!!error}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+                  className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
               </div>
             </div>
 
             <div>
               <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700 mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <input
                   id="signup-password"
                   type={showPass ? "text" : "password"}
@@ -148,7 +148,7 @@ function SignupContent() {
                   placeholder="Min. 8 characters"
                   required
                   autoComplete="new-password"
-                  className="w-full pl-10 pr-12 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-11 pr-12 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
                 <button
                   type="button"

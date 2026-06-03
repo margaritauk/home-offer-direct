@@ -27,11 +27,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      setLoading(false);
       router.push("/dashboard");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
       setLoading(false);
+      setError(err instanceof Error ? err.message : "Login failed");
     }
   };
 

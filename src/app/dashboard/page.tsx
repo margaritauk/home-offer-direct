@@ -5,34 +5,13 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import { useAuth, useTierFeatures } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
+import { ALL_PROPERTIES } from "@/lib/properties";
 import {
   FileText, Send, Clock, PlusCircle, Bell, TrendingUp,
   DollarSign, Download, MessageSquare, Bed, Bath,
   ChevronRight, Sparkles, Heart, MapPin, Lock,
   CheckCircle2, Circle, CalendarDays, AlertCircle, ArrowRight, Phone, Mail,
 } from "lucide-react";
-
-/* ── Property data (mirrors search page) ─────────────────────────── */
-const ALL_PROPERTIES = [
-  { id:"1", address:"2847 N Clark St", city:"Chicago, IL", price:485000, beds:3, baths:2, reduced:true, aiScore:87,
-    photo:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=400",
-    agent:{ name:"Sarah Johnson", company:"Coldwell Banker", phone:"(312) 555-0192", email:"sarah.johnson@coldwellbanker.com" } },
-  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago, IL", price:625000, beds:4, baths:2.5, reduced:false, aiScore:72,
-    photo:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400",
-    agent:{ name:"Linda Park", company:"Baird & Warner", phone:"(312) 555-0341", email:"lpark@bairdwarner.com" } },
-  { id:"3", address:"4521 N Ashland Ave", city:"Chicago, IL", price:339000, beds:2, baths:1, reduced:true, aiScore:91,
-    photo:"https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400",
-    agent:{ name:"Mike Torres", company:"Re/Max Chicago", phone:"(312) 555-0847", email:"m.torres@remax.com" } },
-  { id:"4", address:"3102 W Belmont Ave", city:"Chicago, IL", price:549000, beds:3, baths:2, reduced:false, aiScore:65,
-    photo:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=400",
-    agent:{ name:"Donna Keller", company:"Compass", phone:"(312) 555-0223", email:"d.keller@compass.com" } },
-  { id:"5", address:"7845 S Cottage Grove", city:"Chicago, IL", price:229000, beds:3, baths:1.5, reduced:true, aiScore:95,
-    photo:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400",
-    agent:{ name:"James Wu", company:"@properties", phone:"(312) 555-0519", email:"j.wu@atproperties.com" } },
-  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago, IL", price:795000, beds:4, baths:3, reduced:false, aiScore:78,
-    photo:"https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=400",
-    agent:{ name:"Rachel Bloom", company:"Sotheby's", phone:"(312) 555-0761", email:"r.bloom@sothebys.com" } },
-];
 
 /* ── Journey milestones ─────────────────────────────────────────── */
 type MilestoneStatus = "done" | "active" | "upcoming";
@@ -367,7 +346,7 @@ export default function DashboardPage() {
               <>
                 {savedHomes.map(p => (
                   <div key={p.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-lg transition-all" data-testid="saved-home">
-                    <div className="h-48 bg-cover bg-center relative" style={{backgroundImage:`url(${p.photo})`}}>
+                    <div className="h-48 bg-cover bg-center relative" style={{backgroundImage:`url(${p.img})`}}>
                       {p.reduced && (
                         <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-lg">Price Reduced!</div>
                       )}
@@ -378,7 +357,7 @@ export default function DashboardPage() {
                     <div className="p-7">
                       <p className="font-semibold text-slate-900">{p.address}</p>
                       <div className="flex items-center gap-1 text-slate-500 text-xs mb-4">
-                        <MapPin className="w-3 h-3"/> {p.city}
+                        <MapPin className="w-3 h-3"/> {p.city}, {p.state}
                       </div>
                       <p className="text-2xl font-black text-slate-900 mb-5">{formatCurrency(p.price)}</p>
                       <div className="flex items-center gap-3 text-sm text-slate-600 mb-6">
@@ -393,15 +372,15 @@ export default function DashboardPage() {
                     <div className="border-t border-slate-100 px-6 py-4 bg-slate-50/80">
                       <p className="text-xs text-slate-400 mb-2">Listing agent</p>
                       <p className="text-sm font-medium text-slate-900">
-                        {p.agent.name} · <span className="text-slate-500 font-normal">{p.agent.company}</span>
+                        {p.agentName} · <span className="text-slate-500 font-normal">{p.brokerage}</span>
                       </p>
                       <div className="flex flex-wrap gap-2 mt-3">
-                        <a href={`tel:${p.agent.phone.replace(/\D/g,"")}`}
+                        <a href={`tel:${p.agentPhone.replace(/\D/g,"")}`}
                           data-testid="agent-phone"
                           className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 hover:bg-slate-100 transition-colors">
-                          <Phone className="w-3.5 h-3.5 text-slate-400"/> {p.agent.phone}
+                          <Phone className="w-3.5 h-3.5 text-slate-400"/> {p.agentPhone}
                         </a>
-                        <a href={`mailto:${p.agent.email}?subject=Showing request — ${p.address}&body=Hi ${p.agent.name.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${p.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`}
+                        <a href={`mailto:${p.agentEmail}?subject=Showing request — ${p.address}&body=Hi ${p.agentName.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${p.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`}
                           data-testid="agent-email"
                           className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-lg text-blue-700 hover:bg-blue-100 transition-colors">
                           <Mail className="w-3.5 h-3.5"/> Schedule showing

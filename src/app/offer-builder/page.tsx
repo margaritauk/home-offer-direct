@@ -32,6 +32,7 @@ type D = {
   escalation:boolean|null; escIncrement:number; escMax:number;
   sellerCredits:number;
   personalLetter:boolean|null;
+  personalLetterText:string;
 };
 
 /* ─────────────────────────────────────────────────
@@ -66,6 +67,7 @@ const INITIAL_D: D = {
   escalation:null, escIncrement:2500, escMax:510000,
   sellerCredits:-1,
   personalLetter:null,
+  personalLetterText:"",
 };
 
 /* ─────────────────────────────────────────────────
@@ -144,6 +146,8 @@ function OfferBuilderInner() {
 
   const [showHelper, setShowHelper] = useState(false);
   const [hint, setHint] = useState(false);
+  const [dateValue, setDateValue] = useState("");
+  const [confirmReset, setConfirmReset] = useState(false);
 
   // Persist to localStorage whenever d or step changes
   useEffect(() => {
@@ -227,7 +231,7 @@ function OfferBuilderInner() {
             </div>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <button onClick={clearProgress} title="Start over"
+            <button onClick={() => setConfirmReset(true)} title="Start over"
               style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"var(--gray-400)",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6}}>
               <RotateCcw style={{width:13,height:13}}/> Start over
             </button>
@@ -292,7 +296,7 @@ function OfferBuilderInner() {
         {/* ── Main content ── */}
         <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
-            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property}/>
+            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -309,6 +313,32 @@ function OfferBuilderInner() {
           {navContent}
         </div>
       </div>
+
+      {confirmReset && (
+        <>
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.35)",zIndex:299}} onClick={() => setConfirmReset(false)}/>
+          <div role="alertdialog" aria-labelledby="confirm-reset-title" aria-describedby="confirm-reset-body"
+            style={{position:"fixed",zIndex:300,top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:"min(420px,calc(100vw - 32px))",background:"#fff",borderRadius:14,padding:24,boxShadow:"0 20px 60px -8px rgba(0,0,0,0.3)",border:"1px solid var(--gray-200)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12}}>
+              <AlertTriangle style={{width:20,height:20,color:"var(--amber)"}}/>
+              <h2 id="confirm-reset-title" style={{fontSize:17,fontWeight:700,color:"var(--gray-900)",margin:0}}>Start over?</h2>
+            </div>
+            <p id="confirm-reset-body" style={{fontSize:14,color:"var(--gray-500)",lineHeight:1.65,marginBottom:24}}>
+              This will permanently delete your progress on this offer. You&apos;ve completed {step + 1} of {TOTAL} steps and this cannot be undone.
+            </p>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button autoFocus onClick={() => setConfirmReset(false)}
+                style={{padding:"10px 18px",borderRadius:10,border:"1.5px solid var(--gray-200)",background:"#fff",fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:"pointer"}}>
+                Keep my progress
+              </button>
+              <button onClick={() => { setConfirmReset(false); clearProgress(); }}
+                style={{padding:"10px 18px",borderRadius:10,background:"var(--red)",color:"#fff",border:"none",fontSize:14,fontWeight:600,cursor:"pointer"}}>
+                Yes, start over
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -376,8 +406,8 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
   );
 }
 
-function StepView({ step, d, set, showHelper, toggleHelper, property }:
-  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property }) {
+function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue }:
+  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -406,6 +436,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property }:
           {v:"FL",label:"Florida 🌴",note:"FAR forms"},
         ].map(s=>(
           <button key={s.v} onClick={()=>set("state",s.v)}
+            aria-pressed={d.state===s.v}
             className={`option-card ${d.state===s.v?"selected":""}`}
             style={{flexDirection:"column",alignItems:"flex-start",gap:4}}>
             <span style={{fontSize:14,fontWeight:600,color:"var(--gray-900)"}}>{s.label}</span>
@@ -644,17 +675,25 @@ function StepView({ step, d, set, showHelper, toggleHelper, property }:
           {d:45, label:"45 days", note:"Typical for FHA/VA loans"},
           {d:60, label:"60 days", note:"Flexible — seller may prefer this"},
         ].map(o=>(
-          <button key={o.d} onClick={()=>set("closingDays",o.d)}
-            style={{padding:"14px 16px",border:`1.5px solid ${d.closingDays===o.d?"var(--blue)":"var(--gray-200)"}`,
-              borderRadius:10,background:d.closingDays===o.d?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}}>
-            <div style={{fontSize:15,fontWeight:700,color:d.closingDays===o.d?"var(--blue)":"var(--gray-900)"}}>{o.label}</div>
+          <button key={o.d} onClick={()=>{ set("closingDays",o.d); setDateValue(""); }}
+            style={{padding:"14px 16px",border:`1.5px solid ${d.closingDays===o.d&&!dateValue?"var(--blue)":"var(--gray-200)"}`,
+              borderRadius:10,background:d.closingDays===o.d&&!dateValue?"var(--blue-light)":"#fff",cursor:"pointer",textAlign:"left",transition:"all .15s"}}>
+            <div style={{fontSize:15,fontWeight:700,color:d.closingDays===o.d&&!dateValue?"var(--blue)":"var(--gray-900)"}}>{o.label}</div>
             <div style={{fontSize:12,color:o.best?"var(--green)":"var(--gray-500)",marginTop:3,fontWeight:o.best?600:400}}>{o.note}</div>
           </button>
         ))}
       </div>
       <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Or pick a specific date</label>
       <input type="date" className="input-field"
-        min={new Date(Date.now()+15*86400000).toISOString().split("T")[0]}/>
+        value={dateValue}
+        min={new Date(Date.now()+15*86400000).toISOString().split("T")[0]}
+        max={new Date(Date.now()+365*86400000).toISOString().split("T")[0]}
+        onChange={e=>{ setDateValue(e.target.value); if (e.target.value) { const ms = new Date(e.target.value).getTime()-Date.now(); set("closingDays", Math.max(0, Math.round(ms/86400000))); } }}/>
+      {dateValue && (
+        <p style={{fontSize:13,marginTop:8,color:d.closingDays>=21?"var(--green)":"var(--amber)",fontWeight:500}}>
+          That&apos;s {d.closingDays} days from today
+        </p>
+      )}
     </Q>
   );
 
@@ -828,9 +867,15 @@ function StepView({ step, d, set, showHelper, toggleHelper, property }:
         onClick={()=>set("personalLetter",false)}/>
       {d.personalLetter===true && (
         <div style={{marginTop:12}}>
-          <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Your personal letter</label>
-          <textarea rows={5} className="input-field" placeholder="Dear Seller, We are a family of four who fell in love with your home the moment we walked through the door..."
-            style={{resize:"vertical",lineHeight:1.6}}/>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+            <span style={{fontSize:13,fontWeight:500,color:"var(--gray-700)"}}>Your personal letter</span>
+            <span style={{fontSize:12,color:d.personalLetterText.length>=500?"var(--red)":d.personalLetterText.length>=400?"var(--amber)":"var(--gray-500)"}}>{d.personalLetterText.length} / 500</span>
+          </div>
+          <textarea rows={6} className="input-field" placeholder="Dear Seller, We are a family of four who fell in love with your home the moment we walked through the door..."
+            style={{resize:"vertical",lineHeight:1.6}}
+            value={d.personalLetterText}
+            onChange={e=>set("personalLetterText",e.target.value)}
+            maxLength={500}/>
           <p style={{fontSize:12,color:"var(--gray-500)",marginTop:6}}>Keep it to 3–4 short paragraphs. Mention your family, why this neighborhood matters, and how you'll care for the home.</p>
         </div>
       )}

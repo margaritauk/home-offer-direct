@@ -53,10 +53,6 @@ function SignupContent() {
     }
   };
 
-  const handleOAuth = (provider: string) => {
-    setError(`${provider} Sign-In requires OAuth credentials in .env. See docs/auth-setup.md.`);
-  };
-
   return (
     <div className="min-h-screen gradient-bg-soft flex items-center justify-center p-4">
       <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-100">
@@ -104,7 +100,7 @@ function SignupContent() {
           <p className="text-slate-500 mb-8 text-sm">Free to start — no credit card required</p>
 
           {error && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-3 mb-5">
+            <div role="alert" className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-3 mb-5">
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0"/>
               <span className="text-sm text-red-700">{error}</span>
             </div>
@@ -134,6 +130,7 @@ function SignupContent() {
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
                   placeholder="jane@email.com" required autoComplete="email"
+                  aria-invalid={!!error}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
               </div>
             </div>
@@ -144,6 +141,7 @@ function SignupContent() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="Min. 8 characters" required autoComplete="new-password"
+                  aria-invalid={!!error}
                   className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
               </div>
             </div>
@@ -175,22 +173,12 @@ function SignupContent() {
             </button>
           </form>
 
-          <div className="flex items-center gap-3 my-7">
-            <div className="flex-1 h-px bg-slate-200" />
-            <span className="text-xs text-slate-400">or sign up with</span>
-            <div className="flex-1 h-px bg-slate-200" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            {[
-              { label:"Google", logo:"G", color:"hover:bg-red-50" },
-              { label:"Apple",  logo:"🍎", color:"hover:bg-slate-50" },
-            ].map(p => (
-              <button key={p.label} onClick={() => handleOAuth(p.label)}
-                className={`flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 transition-all ${p.color}`}>
-                <span className="font-bold">{p.logo}</span> {p.label}
-              </button>
-            ))}
+          <div style={{marginTop:20,padding:"12px 14px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)",display:"flex",gap:10,alignItems:"flex-start"}}>
+            <Lock style={{width:16,height:16,color:"var(--gray-500)",flexShrink:0,marginTop:1}}/>
+            <div>
+              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:2}}>Your data is encrypted and never sold.</p>
+              <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.6}}>We use 256-bit SSL. Payment is handled by Stripe — we never store card numbers.</p>
+            </div>
           </div>
 
           <p className="text-center mt-6 text-sm text-slate-500">

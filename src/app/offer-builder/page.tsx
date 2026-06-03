@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
@@ -9,6 +9,8 @@ import { track } from "@/lib/analytics";
 import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
 import { useAuth } from "@/lib/auth-context";
+import { scoreOffer } from "@/lib/scoring";
+import type { ScoringResult } from "@/lib/scoring";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -250,6 +252,25 @@ function OfferBuilderInner() {
   const [preApprovalUploading, setPreApprovalUploading] = useState(false);
   const [preApprovalLocalFile, setPreApprovalLocalFile] = useState<File | null>(null);
 
+  // ── Scoring: recompute whenever d or property changes ──────────────
+  const scoringResult: ScoringResult = useMemo(() => {
+    return scoreOffer({
+      offerPrice: d.offerPrice > 0 ? d.offerPrice : property.price,
+      listPrice: property.price,
+      inspectionContingency: d.inspectionContingency ?? true,
+      financingContingency: d.financeType === "cash" ? false : (d.financingContingency ?? true),
+      appraisalContingency: d.financeType === "cash" ? false : (d.appraisalContingency ?? true),
+      cashOffer: d.financeType === "cash",
+      closingDays: d.closingDays > 0 ? d.closingDays : 45,
+      escalation: d.escalation ?? false,
+      escalationIncrement: d.escIncrement,
+      escalationCap: d.escMax,
+      emdPercent: d.earnestPct,
+      sellerCredits: d.sellerCredits,
+      preApprovalUploaded: !!(preApprovalPath || preApprovalLocalFile),
+    });
+  }, [d, property.price, preApprovalPath, preApprovalLocalFile]);
+
   // Supabase offer row ID — once created, subsequent saves use upsert with this id
   const supabaseOfferId = useRef<string | null>(null);
   // Debounce timer ref for Supabase upserts
@@ -263,12 +284,28 @@ function OfferBuilderInner() {
     saveTimer.current = setTimeout(async () => {
       try {
         const supabase = await getSupabaseClient();
+        const currentScore = scoreOffer({
+          offerPrice: currentD.offerPrice > 0 ? currentD.offerPrice : property.price,
+          listPrice: property.price,
+          inspectionContingency: currentD.inspectionContingency ?? true,
+          financingContingency: currentD.financeType === "cash" ? false : (currentD.financingContingency ?? true),
+          appraisalContingency: currentD.financeType === "cash" ? false : (currentD.appraisalContingency ?? true),
+          cashOffer: currentD.financeType === "cash",
+          closingDays: currentD.closingDays > 0 ? currentD.closingDays : 45,
+          escalation: currentD.escalation ?? false,
+          escalationIncrement: currentD.escIncrement,
+          escalationCap: currentD.escMax,
+          emdPercent: currentD.earnestPct,
+          sellerCredits: currentD.sellerCredits,
+          preApprovalUploaded: !!(preApprovalPath),
+        });
         const payload: Record<string, unknown> = {
           user_id: user.id,
           address: `${property.address}, ${property.city}, ${property.state} ${property.zip}`,
           list_price: property.price,
           status: "draft" as const,
-          tier: user.tier,
+          tier: currentScore.tier,
+          ai_score: currentScore.score,
           offer_price: currentD.offerPrice > 0 ? currentD.offerPrice : null,
           terms: { step: currentStep, ...currentD, preApprovalPath } as Record<string, unknown>,
         };
@@ -603,7 +640,8 @@ function OfferBuilderInner() {
           <div key={step} className="fade-up">
             <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
               preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}
-              sigCanvasRef={sigCanvasRef as React.RefObject<SignatureCanvas>}/>
+              sigCanvasRef={sigCanvasRef as React.RefObject<SignatureCanvas>}
+              scoringResult={scoringResult}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -778,10 +816,10 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
 }
 
 function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
-  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef }:
+  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef, scoringResult }:
   { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void;
     preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void>;
-    sigCanvasRef: React.RefObject<SignatureCanvas> }) {
+    sigCanvasRef: React.RefObject<SignatureCanvas>; scoringResult: ScoringResult }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -1446,8 +1484,59 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       {section:"Terms",      items:[["Escalation",d.escalation?`Yes · up to ${fmt(d.escMax)}`:"No"],["Seller credits",d.sellerCredits>0?fmt(d.sellerCredits):"None"],["Personal letter",d.personalLetter?"Yes":"No"]]},
       {section:"Signature",  items:[["Signed by",d.signatureName||"—"],["Signed on",d.signatureDate?new Date(d.signatureDate).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"]]},
     ];
+
+    const tierColor = scoringResult.tier === "strong" ? "var(--green)" : scoringResult.tier === "competitive" ? "var(--amber)" : "var(--red)";
+    const tierBg   = scoringResult.tier === "strong" ? "#d1fae5" : scoringResult.tier === "competitive" ? "#fef3c7" : "#fee2e2";
+    const tierLabel = scoringResult.tier === "strong" ? "Strong" : scoringResult.tier === "competitive" ? "Competitive" : "Weak";
+
     return (
       <Q title="Review your offer" subtitle="Everything looks good. Confirm before generating your documents.">
+
+        {/* ── Offer confidence score ── */}
+        <div style={{border:`1.5px solid ${tierColor}`,borderRadius:12,padding:"16px 20px",marginBottom:20,background:tierBg}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div>
+              <p style={{fontSize:12,fontWeight:700,color:tierColor,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Offer Confidence Score</p>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <span style={{fontSize:36,fontWeight:800,color:tierColor,lineHeight:1}}>{scoringResult.score}</span>
+                <span style={{fontSize:16,color:tierColor,fontWeight:600}}>/100</span>
+                <span style={{marginLeft:8,fontSize:13,fontWeight:700,padding:"2px 10px",borderRadius:99,background:tierColor,color:"#fff"}}>{tierLabel}</span>
+              </div>
+            </div>
+            {/* Mini score gauge */}
+            <div style={{width:64,height:64,position:"relative",flexShrink:0}}>
+              <svg viewBox="0 0 64 64" style={{width:64,height:64,transform:"rotate(-90deg)"}}>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="6"/>
+                <circle cx="32" cy="32" r="26" fill="none" stroke={tierColor} strokeWidth="6"
+                  strokeDasharray={`${2*Math.PI*26*scoringResult.score/100} ${2*Math.PI*26*(1-scoringResult.score/100)}`}
+                  strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+          {/* Breakdown table */}
+          <div style={{borderTop:`1px solid ${tierColor}`,paddingTop:10,marginTop:4}}>
+            {scoringResult.breakdown.map(row => (
+              <div key={row.label} style={{marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--gray-700)"}}>{row.label}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:row.points===row.maxPoints?tierColor:"var(--gray-500)"}}>
+                    {row.points} / {row.maxPoints} pts
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div style={{height:4,background:"rgba(0,0,0,0.08)",borderRadius:2,overflow:"hidden",marginBottom:row.tip&&row.points<row.maxPoints?4:0}}>
+                  <div style={{height:4,background:tierColor,borderRadius:2,width:`${row.maxPoints>0?(row.points/row.maxPoints)*100:0}%`,transition:"width .4s"}}/>
+                </div>
+                {row.tip && row.points < row.maxPoints && (
+                  <p style={{fontSize:11,color:"var(--gray-600)",lineHeight:1.5,marginTop:2}}>
+                    {row.tip}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="card" style={{overflow:"hidden",marginBottom:16}}>
           {rows.map(r=>(
             <div key={r.section}>
@@ -1464,7 +1553,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           ))}
         </div>
         <div className="good-box">
-          <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>✓ Your offer package is ready to generate. You'll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
+          <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>Your offer package is ready to generate. You&apos;ll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
         </div>
       </Q>
     );

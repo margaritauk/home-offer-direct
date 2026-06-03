@@ -158,6 +158,14 @@ function OfferBuilderInner() {
   const [dateValue, setDateValue] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Pre-approval upload state
+  const [preApprovalPath, setPreApprovalPath] = useState<string | null>(null);
+  const [preApprovalUploadError, setPreApprovalUploadError] = useState<string | null>(null);
+  const [preApprovalUploading, setPreApprovalUploading] = useState(false);
+  const [preApprovalLocalFile, setPreApprovalLocalFile] = useState<File | null>(null);
 
   // Supabase offer row ID — once created, subsequent saves use upsert with this id
   const supabaseOfferId = useRef<string | null>(null);
@@ -179,7 +187,7 @@ function OfferBuilderInner() {
           status: "draft" as const,
           tier: user.tier,
           offer_price: currentD.offerPrice > 0 ? currentD.offerPrice : null,
-          terms: { step: currentStep, ...currentD } as Record<string, unknown>,
+          terms: { step: currentStep, ...currentD, preApprovalPath } as Record<string, unknown>,
         };
         // Only set property_id FK when the id is a real UUID (DB row)
         if (isValidUUID(propertyId)) {
@@ -236,6 +244,113 @@ function OfferBuilderInner() {
     supabaseOfferId.current = null;
     setShowHelper(false);
     setHint(false);
+    setPreApprovalPath(null);
+    setPreApprovalUploadError(null);
+    setPreApprovalLocalFile(null);
+  };
+
+  const handlePreApprovalUpload = async (file: File) => {
+    // Validate type
+    if (file.type !== "application/pdf") {
+      setPreApprovalUploadError("Only PDF files are accepted.");
+      return;
+    }
+    // Validate size (10 MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setPreApprovalUploadError("File must be 10 MB or smaller.");
+      return;
+    }
+    setPreApprovalUploadError(null);
+    setPreApprovalLocalFile(file);
+
+    if (!SUPABASE_ENABLED) {
+      // Store locally only — no upload
+      return;
+    }
+
+    setPreApprovalUploading(true);
+    try {
+      const supabase = await getSupabaseClient();
+      const userId = user?.id ?? "anon";
+      const offerId = supabaseOfferId.current;
+      const prefix = offerId ?? String(Date.now());
+      const storagePath = `pre-approvals/${userId}/${prefix}-preapproval.pdf`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error("offer-builder: pre-approval upload failed", uploadError);
+        setPreApprovalUploadError("Upload failed — please try again.");
+        setPreApprovalUploading(false);
+        return;
+      }
+
+      const savedPath = uploadData?.path ?? storagePath;
+      setPreApprovalPath(savedPath);
+
+      // Insert row into public.documents only when we have an offer_id
+      if (offerId) {
+        const { error: dbError } = await supabase
+          .from("documents")
+          .insert({ offer_id: offerId, type: "pre_approval", storage_path: savedPath });
+        if (dbError) {
+          console.error("offer-builder: documents insert failed", dbError);
+        }
+      }
+    } catch (err) {
+      console.error("offer-builder: pre-approval upload error", err);
+      setPreApprovalUploadError("Upload failed — please try again.");
+    } finally {
+      setPreApprovalUploading(false);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    track({ event: "offer_builder_submitted" });
+    setSubmitError(null);
+
+    // Always update localStorage to mark as submitted
+    try {
+      const saved = localStorage.getItem(storageKey);
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, status: "submitted" }));
+    } catch {}
+
+    if (SUPABASE_ENABLED && user) {
+      setIsSubmitting(true);
+      try {
+        const supabase = await getSupabaseClient();
+        const offerId = supabaseOfferId.current;
+        if (offerId) {
+          const { error } = await supabase
+            .from("offers")
+            .update({ status: "submitted", updated_at: new Date().toISOString() })
+            .eq("id", offerId);
+          if (error) {
+            console.error("offer-builder: failed to submit offer", error);
+            setSubmitError("Failed to submit offer — please try again");
+            setIsSubmitting(false);
+            return;
+          }
+          setIsSubmitting(false);
+          router.push(`/offer-submitted?offerId=${offerId}`);
+          return;
+        } else {
+          // No Supabase row yet — fall through to pricing modal
+          setIsSubmitting(false);
+        }
+      } catch (err) {
+        console.error("offer-builder: submit error", err);
+        setSubmitError("Failed to submit offer — please try again");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Fallback: open pricing modal when Supabase is not enabled or no row id
+    setShowPricingModal(true);
   };
 
   const set = <K extends keyof D>(k:K, v:D[K]) => setD(p=>({...p,[k]:v}));
@@ -265,6 +380,11 @@ function OfferBuilderInner() {
   /* ── Nav content (shared between in-flow and sticky) ── */
   const navContent = (
     <>
+      {submitError && (
+        <p role="alert" style={{fontSize:13,color:"var(--red)",fontWeight:500,textAlign:"center",gridColumn:"1/-1",margin:"4px 0 -4px"}}>
+          {submitError}
+        </p>
+      )}
       <button onClick={back} disabled={step===0}
         style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",background:"transparent",border:"1.5px solid var(--gray-200)",borderRadius:10,fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:step===0?"not-allowed":"pointer",opacity:step===0?.4:1}}>
         <ArrowLeft style={{width:15,height:15}}/> Back
@@ -282,9 +402,9 @@ function OfferBuilderInner() {
             style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:continueDisabled?"not-allowed":"pointer",opacity:continueDisabled?0.5:1,transition:"opacity .15s"}}>
             Continue <ArrowRight style={{width:15,height:15}}/>
           </button>
-        : <button onClick={() => { track({ event: "offer_builder_submitted" }); setShowPricingModal(true); }}
-            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
-            Get my offer package <ArrowRight style={{width:15,height:15}}/>
+        : <button onClick={handleFinalSubmit} disabled={isSubmitting}
+            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:isSubmitting?"not-allowed":"pointer",opacity:isSubmitting?0.6:1,transition:"opacity .15s"}}>
+            {isSubmitting ? "Submitting…" : "Submit offer"} <ArrowRight style={{width:15,height:15}}/>
           </button>
       }
     </>
@@ -376,7 +496,8 @@ function OfferBuilderInner() {
         {/* ── Main content ── */}
         <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
-            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}/>
+            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
+              preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -548,8 +669,10 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
   );
 }
 
-function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue }:
-  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void }) {
+function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
+  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload }:
+  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void;
+    preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void> }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -634,6 +757,50 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       {d.financeType!=="cash" && d.preApproved===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e"}}>⚠️ <strong>Tip:</strong> Sellers often won't consider offers without pre-approval. We recommend getting one before submitting — it takes 24–48 hours online.</p>
+        </div>
+      )}
+      {d.financeType!=="cash" && d.preApproved===true && (
+        <div style={{marginTop:16}}>
+          {preApprovalPath || preApprovalLocalFile ? (
+            <div className="good-box" style={{display:"flex",alignItems:"center",gap:10}}>
+              <CheckCircle style={{width:16,height:16,color:"var(--green)",flexShrink:0}}/>
+              <span style={{fontSize:13,fontWeight:600,color:"#065f46"}}>
+                Pre-approval uploaded ✓
+                {preApprovalLocalFile && !preApprovalPath && " (saved locally)"}
+              </span>
+            </div>
+          ) : (
+            <div style={{border:"1.5px dashed var(--gray-300)",borderRadius:10,padding:"18px 20px",background:"var(--gray-50)"}}>
+              <label style={{display:"block",cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <span style={{fontSize:20}}>📎</span>
+                  <span style={{fontSize:14,fontWeight:600,color:"var(--gray-700)"}}>
+                    {preApprovalUploading ? "Uploading…" : "Upload pre-approval letter (PDF)"}
+                  </span>
+                </div>
+                <p style={{fontSize:12,color:"var(--gray-400)",marginBottom:12}}>Accepted: PDF only · Max 10 MB</p>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={preApprovalUploading}
+                  style={{display:"none"}}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) { onPreApprovalUpload(f); }
+                    e.target.value = "";
+                  }}
+                />
+                <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"9px 18px",background:preApprovalUploading?"var(--gray-200)":"var(--blue)",color:"#fff",borderRadius:8,fontSize:13,fontWeight:600,opacity:preApprovalUploading?0.7:1,transition:"opacity .15s"}}>
+                  {preApprovalUploading ? "Uploading…" : "Choose PDF"}
+                </div>
+              </label>
+              {preApprovalUploadError && (
+                <p role="alert" style={{fontSize:13,color:"var(--red)",fontWeight:500,marginTop:10}}>
+                  {preApprovalUploadError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Q>

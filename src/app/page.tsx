@@ -35,7 +35,7 @@ export default function Home() {
                 data-testid="cta-start"
                 className="flex items-center justify-center gap-2 text-white brand-gradient font-semibold px-8 py-4 rounded-xl text-base hover:opacity-90 transition-opacity shadow-sm"
               >
-                Start my offer — it&apos;s free <ArrowRight className="w-4 h-4" />
+                Start my offer &mdash; it&apos;s free <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 href="/dashboard"

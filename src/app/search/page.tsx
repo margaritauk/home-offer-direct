@@ -140,6 +140,65 @@ function SearchContent() {
     return () => clearTimeout(t);
   }, [query]);
 
+  // Close save popover when clicking outside
+  useEffect(() => {
+    if (!showSavePopover) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setShowSavePopover(false);
+        setSaveError("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSavePopover]);
+
+  // Compute auto-generated label from current filters
+  const computeDefaultLabel = () => {
+    const parts: string[] = [];
+    if (query.trim()) parts.push(query.trim());
+    if (beds !== "any") parts.push(`${beds}+ beds`);
+    if (propType !== "any") parts.push(propType);
+    if (priceMin) parts.push(`from ${priceMin}`);
+    if (priceMax) parts.push(`to ${priceMax}`);
+    return parts.length ? parts.join(" · ") : "My Chicago Search";
+  };
+
+  const handleOpenSavePopover = () => {
+    if (!user) { router.push("/login"); return; }
+    setSaveLabel(computeDefaultLabel());
+    setSaveError("");
+    setShowSavePopover(true);
+  };
+
+  const handleSaveSearch = async () => {
+    setSaveError("");
+    try {
+      const res = await fetch("/api/searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: saveLabel,
+          price_min: priceMin ? parseInt(priceMin.replace(/\D/g, "")) : null,
+          price_max: priceMax ? parseInt(priceMax.replace(/\D/g, "")) : null,
+          min_beds: beds !== "any" ? parseInt(beds) : null,
+          property_types: propType !== "any" ? [propType] : [],
+        }),
+      });
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => ({}));
+        const message = (data as { error?: string })?.error ?? "Failed to save search";
+        setSaveError(message);
+        return;
+      }
+      setShowSavePopover(false);
+      setSaveBanner(true);
+      setTimeout(() => setSaveBanner(false), 3000);
+    } catch {
+      setSaveError("Network error — please try again");
+    }
+  };
+
   const filteredProperties = properties.filter(p => {
     const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
     const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
@@ -196,6 +255,43 @@ function SearchContent() {
             <button className="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white">
               <SlidersHorizontal className="w-4 h-4" /> Filters
             </button>
+            <div className="relative" ref={popoverRef}>
+              <button
+                onClick={handleOpenSavePopover}
+                className="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white"
+              >
+                <Bookmark className="w-4 h-4" /> Save search
+              </button>
+              {showSavePopover && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg p-4 w-72">
+                  <p className="text-sm font-semibold text-slate-800 mb-2">Save this search</p>
+                  <input
+                    type="text"
+                    value={saveLabel}
+                    onChange={e => setSaveLabel(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                    placeholder="Search label"
+                  />
+                  {saveError && (
+                    <p className="text-xs text-red-600 mb-2">{saveError}</p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleSaveSearch}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg transition-all"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setShowSavePopover(false); setSaveError(""); }}
+                      className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm">
               <Search className="w-4 h-4" /> Search
             </button>
@@ -215,6 +311,13 @@ function SearchContent() {
           </div>
         </div>
       </div>
+
+      {/* Save search success banner */}
+      {saveBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm font-medium px-6 py-3 rounded-xl shadow-lg">
+          Search saved! We&apos;ll find new matches for you.
+        </div>
+      )}
 
       {/* Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

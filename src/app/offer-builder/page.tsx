@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw } from "lucide-react";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -33,35 +34,177 @@ type D = {
   personalLetter:boolean|null;
 };
 
-const PROPERTY = { address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657",
-  price:485000, beds:3, baths:2, sqft:1850, dom:12, agent:"Sarah Johnson",
-  brokerage:"Coldwell Banker", img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop" };
+/* ─────────────────────────────────────────────────
+   PROPERTIES
+───────────────────────────────────────────────── */
+type Property = {
+  id: string; address: string; city: string; state: string; zip: string;
+  price: number; beds: number; baths: number; sqft: number; dom: number;
+  agent: string; brokerage: string; img: string;
+};
+
+const PROPERTIES: Property[] = [
+  { id:"1", address:"2847 N Clark St", city:"Chicago", state:"IL", zip:"60657", price:485000, beds:3, baths:2, sqft:1850, dom:12, agent:"Sarah Johnson", brokerage:"Coldwell Banker", img:"https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=600&auto=format&fit=crop" },
+  { id:"2", address:"1520 W Wrightwood Ave", city:"Chicago", state:"IL", zip:"60614", price:625000, beds:4, baths:2.5, sqft:2400, dom:5, agent:"Linda Park", brokerage:"Baird & Warner", img:"https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=600&auto=format&fit=crop" },
+  { id:"3", address:"4521 N Ashland Ave", city:"Chicago", state:"IL", zip:"60640", price:359000, beds:2, baths:1, sqft:1200, dom:28, agent:"Mike Torres", brokerage:"RE/MAX", img:"https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=600&auto=format&fit=crop" },
+  { id:"4", address:"3102 W Belmont Ave", city:"Chicago", state:"IL", zip:"60618", price:549000, beds:3, baths:2, sqft:2100, dom:3, agent:"Donna Keller", brokerage:"Compass", img:"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=600&auto=format&fit=crop" },
+  { id:"5", address:"7845 S Cottage Grove Ave", city:"Chicago", state:"IL", zip:"60619", price:229000, beds:3, baths:1.5, sqft:1600, dom:45, agent:"James Wu", brokerage:"@properties", img:"https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&auto=format&fit=crop" },
+  { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", zip:"60614", price:795000, beds:4, baths:3, sqft:3200, dom:8, agent:"Rachel Bloom", brokerage:"Sotheby's", img:"https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=600&auto=format&fit=crop" },
+];
 
 const fmt = (n:number) => "$"+n.toLocaleString();
 
-export default function OfferBuilder() {
-  const [step, setStep] = useState(0);
-  const [showHelper, setShowHelper] = useState(false);
-  const [d, setD] = useState<D>({
-    buyerType:"", state:"", firstTime:false,
-    propertyConfirmed:false,
-    offerPrice:0,
-    financeType:"", downPct:0, preApproved:null,
-    closingDays:0, earnestPct:0,
-    inspectionContingency:null, inspectionDays:0,
-    appraisalContingency:null,
-    financingContingency:null, financingDays:21,
-    escalation:null, escIncrement:2500, escMax:510000,
-    sellerCredits:-1,
-    personalLetter:null,
+const INITIAL_D: D = {
+  buyerType:"", state:"", firstTime:false,
+  propertyConfirmed:false,
+  offerPrice:0,
+  financeType:"", downPct:0, preApproved:null,
+  closingDays:0, earnestPct:0,
+  inspectionContingency:null, inspectionDays:0,
+  appraisalContingency:null,
+  financingContingency:null, financingDays:21,
+  escalation:null, escIncrement:2500, escMax:510000,
+  sellerCredits:-1,
+  personalLetter:null,
+};
+
+/* ─────────────────────────────────────────────────
+   VALIDATION
+───────────────────────────────────────────────── */
+function canContinue(step:number, d:D): boolean {
+  switch(step) {
+    case 0:  return d.buyerType !== "";
+    case 1:  return d.state !== "";
+    case 2:  return d.financeType !== "";
+    case 3:  return true;
+    case 4:  return d.offerPrice > 0;
+    case 5:  return d.financeType !== "";
+    case 6:  return d.financeType === "cash" || d.downPct > 0;
+    case 7:  return d.earnestPct > 0;
+    case 8:  return d.closingDays > 0;
+    case 9:  return d.inspectionContingency !== null;
+    case 10: return d.appraisalContingency !== null;
+    case 11: return d.financeType === "cash" || d.financingContingency !== null;
+    case 12: return d.escalation !== null;
+    case 13: return d.sellerCredits !== -1;
+    case 14: return d.personalLetter !== null;
+    default: return true;
+  }
+}
+
+/* ─────────────────────────────────────────────────
+   LOADING SPINNER
+───────────────────────────────────────────────── */
+function LoadingSpinner() {
+  return (
+    <div style={{minHeight:"100vh",background:"var(--gray-50)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{width:40,height:40,border:"3px solid var(--gray-200)",borderTop:"3px solid var(--blue)",borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 16px"}}/>
+        <p style={{fontSize:14,color:"var(--gray-500)"}}>Loading...</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   INNER COMPONENT (uses useSearchParams)
+───────────────────────────────────────────────── */
+function OfferBuilderInner() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const propertyId = searchParams.get("property") ?? "1";
+  const exitDest = searchParams.get("from") ?? "/search";
+  const property = PROPERTIES.find(p => p.id === propertyId) ?? PROPERTIES[0];
+
+  const storageKey = "hod-offer-" + propertyId;
+
+  const [step, setStep] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return typeof parsed.step === "number" ? parsed.step : 0;
+      }
+    } catch {}
+    return 0;
   });
+
+  const [d, setD] = useState<D>(() => {
+    if (typeof window === "undefined") return INITIAL_D;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.d ? { ...INITIAL_D, ...parsed.d } : INITIAL_D;
+      }
+    } catch {}
+    return INITIAL_D;
+  });
+
+  const [showHelper, setShowHelper] = useState(false);
+  const [hint, setHint] = useState(false);
+
+  // Persist to localStorage whenever d or step changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ step, d }));
+    } catch {}
+  }, [d, step, storageKey]);
+
+  const clearProgress = () => {
+    try { localStorage.removeItem(storageKey); } catch {}
+    setD(INITIAL_D);
+    setStep(0);
+    setShowHelper(false);
+    setHint(false);
+  };
 
   const set = <K extends keyof D>(k:K, v:D[K]) => setD(p=>({...p,[k]:v}));
   const pct = Math.round((step/(TOTAL-1))*100);
   const activeSection = SECTIONS.find(s => s.steps.includes(step));
 
-  const next = () => { setStep(s=>Math.min(TOTAL-1,s+1)); setShowHelper(false); };
-  const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); };
+  const next = () => {
+    if (!canContinue(step, d)) {
+      setHint(true);
+      setTimeout(() => setHint(false), 3000);
+      return;
+    }
+    setStep(s=>Math.min(TOTAL-1,s+1));
+    setShowHelper(false);
+    setHint(false);
+  };
+  const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); setHint(false); };
+
+  const continueDisabled = !canContinue(step, d);
+
+  /* ── Nav content (shared between in-flow and sticky) ── */
+  const navContent = (
+    <>
+      <button onClick={back} disabled={step===0}
+        style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",background:"transparent",border:"1.5px solid var(--gray-200)",borderRadius:10,fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:step===0?"not-allowed":"pointer",opacity:step===0?.4:1}}>
+        <ArrowLeft style={{width:15,height:15}}/> Back
+      </button>
+
+      <div style={{textAlign:"center"}}>
+        <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
+        {hint && (
+          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>Select an option to continue</p>
+        )}
+      </div>
+
+      {step < TOTAL-1
+        ? <button onClick={next}
+            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:continueDisabled?"not-allowed":"pointer",opacity:continueDisabled?0.5:1,transition:"opacity .15s"}}>
+            Continue <ArrowRight style={{width:15,height:15}}/>
+          </button>
+        : <Link href="/pricing"
+            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",borderRadius:10,fontSize:14,fontWeight:600,textDecoration:"none"}}>
+            Get my offer package <ArrowRight style={{width:15,height:15}}/>
+          </Link>
+      }
+    </>
+  );
 
   return (
     <div style={{minHeight:"100vh",background:"var(--gray-50)"}}>
@@ -69,7 +212,7 @@ export default function OfferBuilder() {
       <div style={{position:"fixed",top:0,left:0,right:0,zIndex:50,background:"#fff",borderBottom:"1px solid var(--gray-200)",paddingTop:"env(safe-area-inset-top)"}}>
         <div style={{maxWidth:1100,margin:"0 auto",padding:"0 16px",display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <Link href="/" style={{display:"flex",alignItems:"center",gap:8,textDecoration:"none"}}>
-            <div style={{width:28,height:28,borderRadius:7,background:"linear-gradient(135deg,#2563eb,#7c3aed)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:28,height:28,borderRadius:7,background:"var(--blue)",display:"flex",alignItems:"center",justifyContent:"center"}}>
               <Home style={{width:14,height:14,color:"#fff"}}/>
             </div>
             <span style={{fontWeight:700,color:"var(--gray-900)",fontSize:15}}>HomeOffer<span style={{color:"var(--blue)"}}>Direct</span></span>
@@ -83,9 +226,16 @@ export default function OfferBuilder() {
               <div style={{height:4,width:`${pct}%`,background:"linear-gradient(90deg,#2563eb,#7c3aed)",borderRadius:4,transition:"width .4s ease"}}/>
             </div>
           </div>
-          <Link href="/search" style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"var(--gray-500)",textDecoration:"none"}}>
-            <ArrowLeft style={{width:14,height:14}}/> Exit
-          </Link>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <button onClick={clearProgress} title="Start over"
+              style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"var(--gray-400)",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6}}>
+              <RotateCcw style={{width:13,height:13}}/> Start over
+            </button>
+            <button onClick={()=>router.push(exitDest)}
+              style={{display:"flex",alignItems:"center",gap:4,fontSize:13,color:"var(--gray-500)",background:"none",border:"none",cursor:"pointer",padding:0}}>
+              <ArrowLeft style={{width:14,height:14}}/> Exit
+            </button>
+          </div>
         </div>
       </div>
 
@@ -130,44 +280,47 @@ export default function OfferBuilder() {
 
           {/* Property mini card */}
           <div className="card" style={{marginTop:12,overflow:"hidden"}}>
-            <div style={{height:80,backgroundImage:`url(${PROPERTY.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
+            <div style={{height:80,backgroundImage:`url(${property.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
             <div style={{padding:"10px 12px"}}>
-              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-900)"}}>{PROPERTY.address}</p>
-              <p style={{fontSize:11,color:"var(--gray-500)"}}>{PROPERTY.city}, {PROPERTY.state}</p>
-              <p style={{fontSize:15,fontWeight:700,color:"var(--gray-900)",marginTop:4}}>{fmt(PROPERTY.price)}</p>
+              <p style={{fontSize:12,fontWeight:600,color:"var(--gray-900)"}}>{property.address}</p>
+              <p style={{fontSize:11,color:"var(--gray-500)"}}>{property.city}, {property.state}</p>
+              <p style={{fontSize:15,fontWeight:700,color:"var(--gray-900)",marginTop:4}}>{fmt(property.price)}</p>
             </div>
           </div>
         </div>
 
         {/* ── Main content ── */}
-        <div style={{maxWidth:560}}>
+        <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
-            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)}/>
+            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property}/>
           </div>
 
-          {/* Nav buttons */}
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:32,paddingTop:24,borderTop:"1px solid var(--gray-200)"}}>
-            <button onClick={back} disabled={step===0}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",background:"transparent",border:"1.5px solid var(--gray-200)",borderRadius:10,fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:step===0?"not-allowed":"pointer",opacity:step===0?.4:1}}>
-              <ArrowLeft style={{width:15,height:15}}/> Back
-            </button>
-
-            <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
-
-            {step < TOTAL-1
-              ? <button onClick={next}
-                  style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
-                  Continue <ArrowRight style={{width:15,height:15}}/>
-                </button>
-              : <Link href="/pricing"
-                  style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",borderRadius:10,fontSize:14,fontWeight:600,textDecoration:"none"}}>
-                  Get my offer package <ArrowRight style={{width:15,height:15}}/>
-                </Link>
-            }
+          {/* Nav buttons — desktop only (hidden on mobile) */}
+          <div className="hidden md:flex" style={{alignItems:"center",justifyContent:"space-between",marginTop:32,paddingTop:24,borderTop:"1px solid var(--gray-200)"}}>
+            {navContent}
           </div>
         </div>
       </div>
+
+      {/* Mobile sticky bottom nav */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+        style={{background:"#fff",borderTop:"1px solid var(--gray-200)",padding:"12px 16px",paddingBottom:"max(12px, env(safe-area-inset-bottom))"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",maxWidth:560,margin:"0 auto"}}>
+          {navContent}
+        </div>
+      </div>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   PAGE EXPORT (wraps inner in Suspense)
+───────────────────────────────────────────────── */
+export default function OfferBuilderPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner/>}>
+      <OfferBuilderInner/>
+    </Suspense>
   );
 }
 
@@ -223,8 +376,8 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
   );
 }
 
-function StepView({ step, d, set, showHelper, toggleHelper }:
-  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void }) {
+function StepView({ step, d, set, showHelper, toggleHelper, property }:
+  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -299,14 +452,14 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
   if (step===3) return (
     <Q title="Confirm the property" subtitle="Here's the home you're making an offer on.">
       <div className="card" style={{overflow:"hidden",marginBottom:16}}>
-        <div style={{height:180,backgroundImage:`url(${PROPERTY.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
+        <div style={{height:180,backgroundImage:`url(${property.img})`,backgroundSize:"cover",backgroundPosition:"center"}}/>
         <div style={{padding:"16px 20px"}}>
           {[
-            ["Address",`${PROPERTY.address}, ${PROPERTY.city}, ${PROPERTY.state} ${PROPERTY.zip}`],
-            ["List price", fmt(PROPERTY.price)],
-            ["Beds / Baths", `${PROPERTY.beds} bd · ${PROPERTY.baths} ba · ${PROPERTY.sqft.toLocaleString()} sqft`],
-            ["Days on market", `${PROPERTY.dom} days`],
-            ["Listing agent", `${PROPERTY.agent} · ${PROPERTY.brokerage}`],
+            ["Address",`${property.address}, ${property.city}, ${property.state} ${property.zip}`],
+            ["List price", fmt(property.price)],
+            ["Beds / Baths", `${property.beds} bd · ${property.baths} ba · ${property.sqft.toLocaleString()} sqft`],
+            ["Days on market", `${property.dom} days`],
+            ["Listing agent", `${property.agent} · ${property.brokerage}`],
             ["State forms", "Illinois Residential Purchase & Sale Agreement"],
           ].map(([k,v])=>(
             <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
@@ -318,7 +471,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       </div>
       <div className="good-box">
         <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>
-          ✓ This home has been on the market for {PROPERTY.dom} days. Comparable homes in this ZIP sold for 101–103% of asking price in the last 90 days.
+          ✓ This home has been on the market for {property.dom} days. Comparable homes in this ZIP sold for 101–103% of asking price in the last 90 days.
         </p>
       </div>
     </Q>
@@ -327,7 +480,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
   // ── Step 4: Offer price ─────────────────────────────────────────────
   if (step===4) return (
     <Q title="How much do you want to offer?"
-      subtitle={`The asking price is ${fmt(PROPERTY.price)}. Here's what the market data suggests.`}
+      subtitle={`The asking price is ${fmt(property.price)}. Here's what the market data suggests.`}
       helper="Your offer price is the amount you're willing to pay for the home. Going above asking can win bidding wars but you don't want to overpay. Going below asking may save money but could lose the deal. The AI recommendation is based on recent nearby sales, days on market, and current inventory levels."
       showHelper={showHelper} toggleHelper={toggleHelper}>
 
@@ -338,17 +491,17 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
           <span style={{fontSize:13,fontWeight:600,color:"var(--blue)"}}>AI Recommendation for Chicago · Lincoln Park</span>
         </div>
         <p style={{fontSize:13,color:"var(--gray-700)",lineHeight:1.6}}>
-          Based on 14 recent sales, homes here sell for <strong>1–3% above asking</strong> in 9 days average. I recommend <strong>{fmt(492000)}</strong> — competitive without overbidding.
+          Based on 14 recent sales, homes here sell for <strong>1–3% above asking</strong> in 9 days average. I recommend <strong>{fmt(Math.round(property.price*1.015))}</strong> — competitive without overbidding.
         </p>
       </div>
 
       {/* Quick picks */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:16}}>
         {[
-          {p:PROPERTY.price-15000, label:"$15K below asking", note:"Low risk of winning"},
-          {p:PROPERTY.price,       label:"At asking price",   note:"Moderate"},
-          {p:492000,               label:"$7K above asking",  note:"AI recommended", ai:true},
-          {p:PROPERTY.price+20000, label:"$20K above asking", note:"Very competitive"},
+          {p:property.price-15000, label:"$15K below asking", note:"Low risk of winning"},
+          {p:property.price,       label:"At asking price",   note:"Moderate"},
+          {p:Math.round(property.price*1.015), label:"~1.5% above asking", note:"AI recommended", ai:true},
+          {p:property.price+20000, label:"$20K above asking", note:"Very competitive"},
         ].map(o=>(
           <button key={o.p} onClick={()=>set("offerPrice",o.p)}
             style={{padding:"14px 16px",border:`1.5px solid ${d.offerPrice===o.p?"var(--blue)":"var(--gray-200)"}`,borderRadius:10,
@@ -364,7 +517,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       <label style={{display:"block",fontSize:13,fontWeight:500,color:"var(--gray-700)",marginBottom:6}}>Or enter your own amount</label>
       <div style={{position:"relative"}}>
         <span style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",color:"var(--gray-500)",fontSize:15}}>$</span>
-        <input type="number" value={d.offerPrice || ""} placeholder={String(PROPERTY.price)} onChange={e=>set("offerPrice",+e.target.value)}
+        <input type="number" value={d.offerPrice || ""} placeholder={String(property.price)} onChange={e=>set("offerPrice",+e.target.value)}
           className="input-field" style={{paddingLeft:28}}/>
       </div>
 
@@ -372,16 +525,16 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       {d.offerPrice > 0 && <div style={{marginTop:16,padding:"14px 16px",background:"var(--gray-50)",borderRadius:10,border:"1px solid var(--gray-200)"}}>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:8}}>
           <span style={{color:"var(--gray-600)"}}>Offer strength vs. asking price</span>
-          <span style={{fontWeight:700,color:d.offerPrice>=PROPERTY.price?"var(--green)":"var(--amber)"}}>
-            {d.offerPrice>=PROPERTY.price
-              ? `+${fmt(d.offerPrice-PROPERTY.price)} above (${((d.offerPrice/PROPERTY.price-1)*100).toFixed(1)}%)`
-              : `-${fmt(PROPERTY.price-d.offerPrice)} below`}
+          <span style={{fontWeight:700,color:d.offerPrice>=property.price?"var(--green)":"var(--amber)"}}>
+            {d.offerPrice>=property.price
+              ? `+${fmt(d.offerPrice-property.price)} above (${((d.offerPrice/property.price-1)*100).toFixed(1)}%)`
+              : `-${fmt(property.price-d.offerPrice)} below`}
           </span>
         </div>
         <div style={{height:6,background:"var(--gray-200)",borderRadius:3,overflow:"hidden"}}>
-          <div style={{height:6,background:d.offerPrice>=PROPERTY.price?"var(--green)":"var(--amber)",
+          <div style={{height:6,background:d.offerPrice>=property.price?"var(--green)":"var(--amber)",
             borderRadius:3,transition:"width .4s",
-            width:`${Math.min(100,Math.max(5,50+(d.offerPrice-PROPERTY.price)/PROPERTY.price*300))}%`}}/>
+            width:`${Math.min(100,Math.max(5,50+(d.offerPrice-property.price)/property.price*300))}%`}}/>
         </div>
       </div>}
     </Q>
@@ -444,7 +597,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
             </button>
           ))}
         </div>
-        {d.downPct<20 && (
+        {d.downPct>0 && d.downPct<20 && (
           <div className="warn-box" style={{marginTop:12}}>
             <p style={{fontSize:13,color:"#92400e"}}>⚠️ Below 20% down means you'll pay Private Mortgage Insurance (PMI) until you reach 20% equity. This adds roughly ${Math.round(d.offerPrice*0.005/12)}/month to your payment.</p>
           </div>
@@ -549,7 +702,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
         onClick={()=>set("appraisalContingency",false)}/>
       {d.appraisalContingency===false && (
         <div className="warn-box" style={{marginTop:8}}>
-          <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ You offered {fmt(d.offerPrice)} ({fmt(d.offerPrice-PROPERTY.price)} above asking). If the home appraises at asking price, you'd need an extra <strong>{fmt(d.offerPrice-PROPERTY.price)} in cash at closing</strong>.</p>
+          <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ You offered {fmt(d.offerPrice)} ({d.offerPrice > property.price ? fmt(d.offerPrice-property.price)+" above asking" : "at or below asking"}). If the home appraises at asking price, you'd need an extra <strong>{fmt(Math.max(0, d.offerPrice-property.price))} in cash at closing</strong>.</p>
         </div>
       )}
     </Q>
@@ -619,6 +772,13 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
           <p style={{fontSize:12,color:"var(--gray-500)",marginTop:10,lineHeight:1.5}}>
             Your offer will automatically rise by {fmt(d.escIncrement)} increments to beat other offers, up to a max of {fmt(d.escMax)}.
           </p>
+          {d.escMax > 0 && d.escMax <= d.offerPrice && (
+            <div className="warn-box" style={{marginTop:10}}>
+              <p style={{fontSize:13,color:"#92400e",lineHeight:1.5}}>
+                ⚠️ Your maximum ({fmt(d.escMax)}) is at or below your offer price ({fmt(d.offerPrice)}) — the escalation clause won't activate.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </Q>
@@ -631,8 +791,8 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
       helper="Closing costs typically run 2–5% of the loan amount. You can ask the seller to cover some of these costs ('seller concessions'). This is more common in slower markets or when a home has been listed a while. In a very competitive market, asking for credits may weaken your offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>
       <OptionCard icon="🙅" label="No seller credits"
-        desc={`${PROPERTY.dom<=14?"This market is competitive — skipping credits strengthens your offer.":"A clean offer is usually preferred."}`}
-        badge={PROPERTY.dom<=14?"Recommended":""}
+        desc={`${property.dom<=14?"This market is competitive — skipping credits strengthens your offer.":"A clean offer is usually preferred."}`}
+        badge={property.dom<=14?"Recommended":""}
         selected={d.sellerCredits===0}
         onClick={()=>set("sellerCredits",0)}/>
       <OptionCard icon="💰" label="Yes — request seller credits"
@@ -680,8 +840,8 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
   // ── Step 15: Review ─────────────────────────────────────────────────
   if (step===15) {
     const rows = [
-      {section:"Property",   items:[["Address",`${PROPERTY.address}, ${PROPERTY.city}, ${PROPERTY.state}`],["List price",fmt(PROPERTY.price)]]},
-      {section:"Your Offer", items:[["Offer price",fmt(d.offerPrice)],["vs. asking price",d.offerPrice>=PROPERTY.price?`+${fmt(d.offerPrice-PROPERTY.price)} above`:`-${fmt(PROPERTY.price-d.offerPrice)} below`],["Earnest money",`${d.earnestPct}% · ${fmt(Math.round(d.offerPrice*d.earnestPct/100))}`]]},
+      {section:"Property",   items:[["Address",`${property.address}, ${property.city}, ${property.state}`],["List price",fmt(property.price)]]},
+      {section:"Your Offer", items:[["Offer price",fmt(d.offerPrice)],["vs. asking price",d.offerPrice>=property.price?`+${fmt(d.offerPrice-property.price)} above`:`-${fmt(property.price-d.offerPrice)} below`],["Earnest money",`${d.earnestPct}% · ${fmt(Math.round(d.offerPrice*d.earnestPct/100))}`]]},
       {section:"Financing",  items:[[d.financeType==="cash"?"Payment":"Loan type",d.financeType==="cash"?"All cash":`${d.financeType} · ${d.downPct}% down`],["Pre-approved",d.financeType==="cash"?"N/A":d.preApproved?"Yes ✓":"No ⚠️"]]},
       {section:"Timeline",   items:[["Target closing",`${d.closingDays} days`]]},
       {section:"Contingencies", items:[["Inspection",d.inspectionContingency?`Yes · ${d.inspectionDays} days`:"Waived ⚠️"],["Appraisal",d.appraisalContingency?"Yes":"Waived ⚠️"],["Financing",d.financeType==="cash"?"N/A (cash)":d.financingContingency?`Yes · ${d.financingDays} days`:"Waived ⚠️"]]},
@@ -716,7 +876,7 @@ function StepView({ step, d, set, showHelper, toggleHelper }:
     <Q title="Get your offer package" subtitle="Choose how you'd like to receive and deliver your offer.">
       {[
         {icon:"📄", title:"Download PDF package", desc:"Professional PDF with purchase agreement, addendums, and cover letter. You deliver it.", badge:"$29", href:"/pricing"},
-        {icon:"✉️", title:"Send directly to listing agent", desc:`Email to ${PROPERTY.agent} at ${PROPERTY.brokerage} with read receipt tracking.`, badge:"$99 Premium", href:"/pricing", featured:true},
+        {icon:"✉️", title:"Send directly to listing agent", desc:`Email to ${property.agent} at ${property.brokerage} with read receipt tracking.`, badge:"$99 Premium", href:"/pricing", featured:true},
       ].map(o=>(
         <Link key={o.title} href={o.href}
           style={{display:"flex",alignItems:"flex-start",gap:16,padding:"20px",border:`1.5px solid ${o.featured?"var(--blue)":"var(--gray-200)"}`,

@@ -95,10 +95,34 @@ export default function DashboardPage() {
   ].filter(Boolean).join(" · ") || "No active offers";
 
   const stats = [
-    { icon: FileText, label:"Total Offers", value: String(user.offers.length), sub: `${pendingCount} pending` },
-    { icon: Send,     label:"Submitted",    value: String(user.offers.filter(o => o.status !== "draft").length), sub:`${pendingCount} pending` },
-    { icon: Heart,    label:"Saved Homes",  value: String(savedHomes.length), sub: savedHomes.filter(p => p.reduced).length > 0 ? `${savedHomes.filter(p => p.reduced).length} price reduced` : "Browse to save more" },
-    { icon: DollarSign, label:"Potential Savings", value: totalSaved > 0 ? `$${(totalSaved/1000).toFixed(1)}K` : "—", sub:"vs list price" },
+    {
+      icon: FileText,
+      label: "Total Offers",
+      value: user.offers.length > 0 ? String(user.offers.length) : "—",
+      sub: user.offers.length > 0 ? `${pendingCount} pending` : "Start your first offer",
+    },
+    {
+      icon: Send,
+      label: "Submitted",
+      value: user.offers.filter(o => o.status !== "draft").length > 0
+        ? String(user.offers.filter(o => o.status !== "draft").length)
+        : "—",
+      sub: pendingCount > 0 ? `${pendingCount} awaiting response` : "None submitted yet",
+    },
+    {
+      icon: Heart,
+      label: "Saved Homes",
+      value: savedHomes.length > 0 ? String(savedHomes.length) : "—",
+      sub: savedHomes.filter(p => p.reduced).length > 0
+        ? `${savedHomes.filter(p => p.reduced).length} price reduced`
+        : savedHomes.length === 0 ? "Browse homes to save" : "No reductions yet",
+    },
+    {
+      icon: DollarSign,
+      label: "Potential Savings",
+      value: totalSaved > 0 ? `$${(totalSaved / 1000).toFixed(1)}K` : "—",
+      sub: totalSaved > 0 ? "vs list price" : "Make offers to see savings",
+    },
   ];
 
   const AI_RECS = pendingCount > 0 ? [

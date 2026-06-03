@@ -30,8 +30,8 @@ const steps = [
     description:
       "Our AI wizard walks you through every offer term in plain English — price, contingencies, earnest money, closing timeline. No legal experience needed.",
     details: ["Plain-English explanations", "AI-powered suggestions", "State-specific forms"],
-    href: null,
-    cta: null,
+    href: "/offer-builder",
+    cta: "Build my offer",
   },
   {
     icon: Send,
@@ -40,8 +40,8 @@ const steps = [
     description:
       "Download a professional offer package or send directly to the listing agent. Your documents are indistinguishable from agent-submitted offers.",
     details: ["PDF download in seconds", "Direct agent email delivery", "Offer tracking dashboard"],
-    href: null,
-    cta: null,
+    href: "/pricing",
+    cta: "See pricing",
   },
 ];
 

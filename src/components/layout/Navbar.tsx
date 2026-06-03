@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Menu, X, Home, LogOut, User, ChevronDown, LayoutDashboard } from "lucide-react";
@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 
 const navLinks = [
   { label: "How It Works", href: "/#how-it-works" },
-  { label: "Features",     href: "/#features" },
+  { label: "Prepare to Buy", href: "/prepare-to-buy" },
   { label: "Pricing",      href: "/pricing" },
   { label: "FAQ",          href: "/faq" },
 ];
@@ -15,6 +15,19 @@ const navLinks = [
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!userOpen) return;
+    const handle = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setUserOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, [userOpen]);
+
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -88,7 +101,7 @@ export default function Navbar() {
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-2">
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={dropdownRef}>
                 <button
                   onClick={() => setUserOpen((o) => !o)}
                   className="flex items-center gap-2 text-sm text-slate-700 hover:text-slate-900 pl-2 pr-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all"

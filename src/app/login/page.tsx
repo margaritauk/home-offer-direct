@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -78,9 +79,14 @@ export default function LoginPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-slate-700">Password</label>
-                <a href="#" className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                  Forgot password?
-                </a>
+                {forgotSent ? (
+                  <span className="text-xs text-green-600 font-medium">Email hello@homeofferdirect.org</span>
+                ) : (
+                  <button type="button" onClick={() => setForgotSent(true)}
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                    Forgot password?
+                  </button>
+                )}
               </div>
               <div className="relative">
                 <input

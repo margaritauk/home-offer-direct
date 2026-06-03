@@ -39,11 +39,11 @@ export default function FAQPage() {
                     ? <ChevronUp className="w-4 h-4 text-blue-500 flex-shrink-0"/>
                     : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0"/>}
                 </button>
-                {open === i && (
+                <div className={`overflow-hidden transition-all duration-200 ease-out ${open === i ? "max-h-96" : "max-h-0"}`}>
                   <div className="px-5 pb-4 pt-1 border-t border-gray-50">
                     <p className="text-sm text-gray-600 leading-relaxed">{faq.a}</p>
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>

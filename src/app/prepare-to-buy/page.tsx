@@ -123,6 +123,11 @@ ${form.yourName || "[Your Name]"}`;
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
               {copied ? "Copied!" : "Copy template"}
             </button>
+            {copied && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-fade-in-up pointer-events-none">
+                <Check className="w-4 h-4 text-green-400" /> Copied to clipboard
+              </div>
+            )}
             {form.agentEmail && (
               <a
                 href={mailtoLink}
@@ -260,6 +265,11 @@ Thank you!`;
               {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-slate-400" />}
               {copied ? "Copied!" : "Copy showing request"}
             </button>
+            {copied && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-fade-in-up pointer-events-none">
+                <Check className="w-4 h-4 text-green-400" /> Copied to clipboard
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -524,7 +534,7 @@ export default function PrepareToBuyPage() {
               Once you&apos;ve toured the home and have your pre-approval letter, use our AI wizard to build a winning offer in minutes.
             </p>
             <Link
-              href="/search"
+              href="/offer-builder"
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-xl transition-all"
             >
               Build My Offer

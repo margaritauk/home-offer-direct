@@ -31,6 +31,15 @@ export default function SearchPage() {
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
 
+  const filteredProperties = sampleProperties.filter(p => {
+    const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
+    const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
+    if (p.price < min || p.price > max) return false;
+    if (beds !== "any" && p.beds < parseInt(beds, 10)) return false;
+    if (propType !== "any" && p.type !== propType) return false;
+    return true;
+  });
+
   const isSaved = (id: string) => user?.savedHomeIds.includes(id) ?? false;
 
   const toggleSave = (id: string) => {
@@ -99,7 +108,7 @@ export default function SearchPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{sampleProperties.length} homes for sale in Chicago, IL</h1>
+            <h1 className="text-xl font-bold text-slate-900">{filteredProperties.length} homes for sale in Chicago, IL</h1>
             <p className="text-sm text-slate-500 mt-0.5">Updated {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric"})}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -117,9 +126,19 @@ export default function SearchPage() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {sampleProperties.map(p => (
-            <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
-          ))}
+          {filteredProperties.length === 0 ? (
+            <div className="col-span-full py-20 text-center">
+              <p className="text-slate-500 font-medium">No homes match your filters</p>
+              <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
+                className="mt-3 text-sm text-blue-600 hover:underline">
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            filteredProperties.map(p => (
+              <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
+            ))
+          )}
         </div>
       </div>
       <Footer />

@@ -1,7 +1,8 @@
 "use client";
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Home, Mail, Lock, User, ArrowRight, CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -20,9 +21,13 @@ const STATES = [
   { value:"FL", label:"Florida" },
 ];
 
-export default function SignupPage() {
+function SignupContent() {
   const router = useRouter();
   const { register } = useAuth();
+  const searchParams = useSearchParams();
+  const planParam = searchParams.get("plan");
+  const PLAN_LABELS: Record<string, string> = { basic: "Basic — $29", premium: "Premium — $99" };
+  const selectedPlanLabel = planParam ? PLAN_LABELS[planParam] : null;
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,6 +106,13 @@ export default function SignupPage() {
             <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-3 mb-5">
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0"/>
               <span className="text-sm text-red-700">{error}</span>
+            </div>
+          )}
+
+          {selectedPlanLabel && (
+            <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-3 mb-5">
+              <CheckCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+              <span className="text-sm text-blue-700">You selected <strong>{selectedPlanLabel}</strong> — complete signup to continue</span>
             </div>
           )}
 
@@ -187,5 +199,13 @@ export default function SignupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupContent />
+    </Suspense>
   );
 }

@@ -14,6 +14,76 @@ import {
   Phone, Mail,
 } from "lucide-react";
 
+/* ── Supabase DB row shape (only columns that exist in the schema) ──── */
+interface DbPropertyRow {
+  id: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number | null;
+  dom: number | null;
+  agent_name: string | null;
+  agent_email: string | null;
+  brokerage: string | null;
+  img: string | null;
+}
+
+/* ── Map a DB row to the Property interface ─────────────────────────── */
+function dbRowToProperty(row: DbPropertyRow): Property {
+  const price = row.price;
+  const dom = row.dom ?? 0;
+  // Deterministic AI score based on first char of UUID
+  const aiScore = (row.id.charCodeAt(0) % 30) + 70;
+  const aiLabel =
+    aiScore >= 90 ? "Best Deal" : aiScore >= 80 ? "Great Value" : "Well-Priced";
+  const marketTrend: string = dom < 10 ? "hot" : dom > 30 ? "cooling" : "neutral";
+  const agentName = row.agent_name ?? "";
+  const agentEmail = row.agent_email ?? "";
+  const img = row.img ?? "";
+  return {
+    id: row.id,
+    address: row.address,
+    city: row.city,
+    state: row.state,
+    zip: row.zip,
+    price,
+    beds: row.beds,
+    baths: row.baths,
+    sqft: row.sqft ?? 0,
+    dom,
+    agent: agentName,
+    agentName,
+    agentPhone: "",
+    agentEmail,
+    brokerage: row.brokerage ?? "",
+    img,
+    photos: img ? [img] : [],
+    type: "Single Family",
+    priceHistory: "same",
+    priceChange: 0,
+    reduced: false,
+    aiScore,
+    aiLabel,
+    aiColor: "text-blue-700 bg-blue-50",
+    suggestedOffer: [Math.round(price * 0.97), Math.round(price * 1.02)],
+    marketTrend,
+  };
+}
+
+const SUPABASE_ENABLED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+async function getSupabaseClient() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
+
 function SearchContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -26,12 +96,42 @@ function SearchContent() {
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
 
+  // Properties state — starts with mock data, replaced by DB data when available
+  const [properties, setProperties] = useState<Property[]>(ALL_PROPERTIES);
+  const [propertiesLoading, setPropertiesLoading] = useState(SUPABASE_ENABLED);
+
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = await getSupabaseClient();
+        const { data, error } = await supabase
+          .from("properties")
+          .select("*")
+          .limit(100);
+        if (cancelled) return;
+        if (error || !data || data.length === 0) {
+          // Fall back to mock data on error or empty result
+          setProperties(ALL_PROPERTIES);
+        } else {
+          setProperties((data as DbPropertyRow[]).map(dbRowToProperty));
+        }
+      } catch {
+        if (!cancelled) setProperties(ALL_PROPERTIES);
+      } finally {
+        if (!cancelled) setPropertiesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  const filteredProperties = ALL_PROPERTIES.filter(p => {
+  const filteredProperties = properties.filter(p => {
     const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
     const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
     if (p.price < min || p.price > max) return false;
@@ -120,7 +220,9 @@ function SearchContent() {
         )}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-slate-900">{filteredProperties.length} homes for sale in Chicago, IL</h1>
+            <h1 className="text-xl font-bold text-slate-900">
+              {propertiesLoading ? "Loading homes..." : `${filteredProperties.length} homes for sale in Chicago, IL`}
+            </h1>
             <p className="text-sm text-slate-500 mt-0.5">Updated {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric"})}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -137,21 +239,38 @@ function SearchContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProperties.length === 0 ? (
-            <div className="col-span-full py-20 text-center">
-              <p className="text-slate-500 font-medium">No homes match your filters</p>
-              <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
-                className="mt-3 text-sm text-blue-600 hover:underline">
-                Clear filters
-              </button>
-            </div>
-          ) : (
-            filteredProperties.map(p => (
-              <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
-            ))
-          )}
-        </div>
+        {propertiesLoading ? (
+          /* Loading skeleton — 6 placeholder cards */
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm animate-pulse">
+                <div className="h-52 bg-slate-200" />
+                <div className="p-5 space-y-3">
+                  <div className="h-6 bg-slate-200 rounded w-2/3" />
+                  <div className="h-4 bg-slate-100 rounded w-full" />
+                  <div className="h-4 bg-slate-100 rounded w-3/4" />
+                  <div className="h-10 bg-slate-200 rounded-xl mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredProperties.length === 0 ? (
+              <div className="col-span-full py-20 text-center">
+                <p className="text-slate-500 font-medium">No homes match your filters</p>
+                <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
+                  className="mt-3 text-sm text-blue-600 hover:underline">
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              filteredProperties.map(p => (
+                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
+              ))
+            )}
+          </div>
+        )}
       </div>
       <Footer />
     </div>

@@ -1,11 +1,12 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
+import { useAuth } from "@/lib/auth-context";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -98,11 +99,30 @@ function LoadingSpinner() {
 }
 
 /* ─────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────── */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
+const SUPABASE_ENABLED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+async function getSupabaseClient() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
+
+/* ─────────────────────────────────────────────────
    INNER COMPONENT (uses useSearchParams)
 ───────────────────────────────────────────────── */
 function OfferBuilderInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const propertyId = searchParams.get("property") ?? "1";
   const exitDest = searchParams.get("from") ?? "/search";
   const property = PROPERTIES.find(p => p.id === propertyId) ?? PROPERTIES[0];
@@ -139,12 +159,67 @@ function OfferBuilderInner() {
   const [confirmReset, setConfirmReset] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
 
+  // Supabase offer row ID — once created, subsequent saves use upsert with this id
+  const [supabaseOfferId, setSupabaseOfferId] = useState<string | null>(null);
+  // Debounce timer ref for Supabase upserts
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Upsert draft offer to Supabase (debounced)
+  const upsertOfferToSupabase = (currentStep: number, currentD: D, offerId: string | null) => {
+    if (!SUPABASE_ENABLED || !user) return;
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const supabase = await getSupabaseClient();
+        const payload: Record<string, unknown> = {
+          user_id: user.id,
+          address: `${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+          list_price: property.price,
+          status: "draft" as const,
+          tier: user.tier,
+          offer_price: currentD.offerPrice > 0 ? currentD.offerPrice : null,
+          terms: { step: currentStep, ...currentD } as Record<string, unknown>,
+        };
+        // Only set property_id FK when the id is a real UUID (DB row)
+        if (isValidUUID(propertyId)) {
+          payload.property_id = propertyId;
+        }
+        if (offerId) {
+          payload.id = offerId;
+        }
+        const { data, error } = await supabase
+          .from("offers")
+          .upsert(payload, { onConflict: "id" })
+          .select("id")
+          .single();
+        if (error) {
+          console.error("offer-builder: Supabase upsert failed", error);
+          return;
+        }
+        if (data?.id && !offerId) {
+          setSupabaseOfferId(data.id as string);
+        }
+      } catch (err) {
+        console.error("offer-builder: Supabase save error", err);
+      }
+    }, 600);
+  };
+
   // Persist to localStorage whenever d or step changes
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify({ step, d }));
     } catch {}
   }, [d, step, storageKey]);
+
+  // On mount (step >= 1 or when user advances to step 2+): create initial draft
+  useEffect(() => {
+    if (step >= 1) {
+      upsertOfferToSupabase(step, d, supabaseOfferId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     track({ event: "offer_builder_started", property_id: property.id });
@@ -155,6 +230,7 @@ function OfferBuilderInner() {
     try { localStorage.removeItem(storageKey); } catch {}
     setD(INITIAL_D);
     setStep(0);
+    setSupabaseOfferId(null);
     setShowHelper(false);
     setHint(false);
   };
@@ -169,10 +245,15 @@ function OfferBuilderInner() {
       setTimeout(() => setHint(false), 3000);
       return;
     }
-    setStep(s=>Math.min(TOTAL-1,s+1));
+    const nextStep = Math.min(TOTAL - 1, step + 1);
+    setStep(nextStep);
     track({ event: "offer_builder_step_completed", step, step_name: activeSection?.label ?? "" });
     setShowHelper(false);
     setHint(false);
+    // Supabase auto-save: trigger on advancing to step 2+ (after setup section starts)
+    if (nextStep >= 1) {
+      upsertOfferToSupabase(nextStep, d, supabaseOfferId);
+    }
   };
   const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); setHint(false); };
 

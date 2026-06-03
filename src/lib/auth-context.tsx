@@ -9,7 +9,7 @@ export interface UserOffer {
   address: string;
   price: number;
   listPrice: number;
-  status: "pending" | "submitted" | "draft" | "accepted" | "rejected" | "withdrawn";
+  status: "pending" | "submitted" | "draft" | "accepted" | "rejected" | "withdrawn" | "cancelled";
   label: string;
   date: string;
   img: string;
@@ -108,14 +108,59 @@ async function getSupabaseClient() {
   return createClient();
 }
 
-function supabaseUserToAuthUser(sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }, profile?: { name?: string; tier?: string; state?: string }): AuthUser {
+const STATUS_LABEL: Record<string, string> = {
+  draft:     "Draft",
+  submitted: "Submitted",
+  pending:   "Pending review",
+  accepted:  "Accepted",
+  rejected:  "Not accepted",
+  withdrawn: "Withdrawn",
+  cancelled: "Cancelled",
+};
+
+interface DbOfferRow {
+  id: string;
+  status: string;
+  offer_price: number | null;
+  list_price: number | null;
+  property_address: string | null;
+  address: string | null;
+  created_at: string;
+}
+
+function dbRowToUserOffer(row: DbOfferRow): UserOffer {
+  const resolvedAddress = row.property_address ?? row.address ?? "Address not provided";
+  const statusKey = row.status as UserOffer["status"];
+  return {
+    id: row.id,
+    address: resolvedAddress,
+    price: row.offer_price ?? 0,
+    listPrice: row.list_price ?? 0,
+    status: statusKey,
+    label: STATUS_LABEL[row.status] ?? row.status,
+    date: new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    img: "",
+  };
+}
+
+async function fetchUserOffers(supabase: Awaited<ReturnType<typeof getSupabaseClient>>, userId: string): Promise<UserOffer[]> {
+  const { data, error } = await supabase
+    .from("offers")
+    .select("id, status, offer_price, list_price, property_address, address, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return (data as DbOfferRow[]).map(dbRowToUserOffer);
+}
+
+function supabaseUserToAuthUser(sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }, profile?: { name?: string; tier?: string; state?: string }, offers: UserOffer[] = []): AuthUser {
   return {
     id: sbUser.id,
     name: (profile?.name as string) ?? (sbUser.user_metadata?.name as string) ?? sbUser.email ?? "User",
     email: sbUser.email ?? "",
     tier: ((profile?.tier as Tier) ?? "free"),
     state: (profile?.state as string) ?? "IL",
-    offers: [],
+    offers,
     savedHomeIds: [],
   };
 }
@@ -141,7 +186,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select("name, tier, state")
               .eq("id", data.user.id)
               .single();
-            const authUser = supabaseUserToAuthUser(data.user, profile ?? undefined);
+            const offers = await fetchUserOffers(supabase, data.user.id);
+            const authUser = supabaseUserToAuthUser(data.user, profile ?? undefined, offers);
             const { data: savedRows } = await supabase
               .from("saved_homes")
               .select("property_id")
@@ -163,7 +209,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .select("name, tier, state")
                 .eq("id", session.user.id)
                 .single();
-              const authUser = supabaseUserToAuthUser(session.user, profile ?? undefined);
+              const offers = await fetchUserOffers(supabase, session.user.id);
+              const authUser = supabaseUserToAuthUser(session.user, profile ?? undefined, offers);
               const { data: savedRows } = await supabase
                 .from("saved_homes")
                 .select("property_id")

@@ -46,11 +46,11 @@ function SignupContent() {
     try {
       await register(name, email, password, state || "IL");
       localStorage.setItem("hod-new-user", "1");
+      setLoading(false);
       router.push(planParam ? `/checkout?plan=${planParam}` : "/search?welcome=1");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
       setLoading(false);
+      setError(err instanceof Error ? err.message : "Registration failed");
     }
   };
 

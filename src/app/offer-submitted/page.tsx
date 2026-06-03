@@ -9,26 +9,36 @@ import Footer from "@/components/layout/Footer";
 /* ─────────────────────────────────────────────────
    NEXT STEP CARDS
 ───────────────────────────────────────────────── */
-const NEXT_STEPS = [
+type NextStep = {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  href: (offerId: string | null) => string;
+  label: string;
+  download?: boolean;
+};
+
+const NEXT_STEPS: NextStep[] = [
   {
     icon: FileText,
     title: "Download your offer PDF",
     description: "Get a professionally formatted PDF of your complete offer package.",
-    href: "/dashboard",
-    label: "Go to dashboard",
+    href: (offerId) => offerId ? `/api/offers/${offerId}/pdf` : "/dashboard",
+    label: "Download PDF",
+    download: true,
   },
   {
     icon: Mail,
     title: "Email offer to listing agent",
     description: "Send your offer directly to the listing agent with read receipt tracking.",
-    href: "/dashboard",
+    href: () => "/dashboard",
     label: "Go to dashboard",
   },
   {
     icon: BarChart2,
     title: "Track your offer",
     description: "Monitor the status of your offer and receive updates in real time.",
-    href: "/dashboard",
+    href: () => "/dashboard",
     label: "Go to dashboard",
   },
 ];
@@ -74,10 +84,12 @@ function OfferSubmittedInner() {
               <div className="space-y-3">
                 {NEXT_STEPS.map((step) => {
                   const Icon = step.icon;
+                  const href = step.href(offerId);
                   return (
                     <Link
                       key={step.title}
-                      href={step.href}
+                      href={href}
+                      {...(step.download ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="flex items-start gap-4 p-4 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all group"
                     >
                       <div className="w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center flex-shrink-0 transition-colors">

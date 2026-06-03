@@ -108,6 +108,10 @@ function SearchContent() {
   const [propertiesLoading, setPropertiesLoading] = useState(SUPABASE_ENABLED);
   const [usingDbProperties, setUsingDbProperties] = useState(false);
 
+  // Realtime new-listings state
+  const [newListingsCount, setNewListingsCount] = useState(0);
+  const pendingNewProps = useRef<Property[]>([]);
+
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
     let cancelled = false;
@@ -133,6 +137,28 @@ function SearchContent() {
       }
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+    // Use a stable ref to hold cleanup so the return function can call it
+    const cleanup = { fn: () => {} };
+    getSupabaseClient().then(supabase => {
+      const channel = supabase
+        .channel("properties-inserts")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "properties" },
+          (payload: { new: unknown }) => {
+            const newProp = dbRowToProperty(payload.new as DbPropertyRow);
+            pendingNewProps.current = [...pendingNewProps.current, newProp];
+            setNewListingsCount(c => c + 1);
+          }
+        )
+        .subscribe();
+      cleanup.fn = () => { supabase.removeChannel(channel); };
+    });
+    return () => { cleanup.fn(); };
   }, []);
 
   useEffect(() => {
@@ -384,6 +410,17 @@ function SearchContent() {
           </div>
         )}
       </div>
+      {newListingsCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 text-sm font-semibold cursor-pointer"
+          onClick={() => {
+            setProperties(prev => [...pendingNewProps.current, ...prev]);
+            pendingNewProps.current = [];
+            setNewListingsCount(0);
+          }}>
+          <Sparkles className="w-4 h-4" />
+          {newListingsCount} new listing{newListingsCount > 1 ? "s" : ""} — click to show
+        </div>
+      )}
       <Footer />
     </div>
   );

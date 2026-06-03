@@ -833,6 +833,13 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           <p style={{fontSize:13,color:"#92400e"}}>⚠️ <strong>Tip:</strong> Sellers often won't consider offers without pre-approval. We recommend getting one before submitting — it takes 24–48 hours online.</p>
         </div>
       )}
+      {/* Pre-qualification vs pre-approval explainer */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:12,padding:"8px 12px",background:"var(--gray-50)",borderRadius:8,border:"1px solid var(--gray-200)"}}>
+        <TermTip tip={TIPS.preQualification}/>
+        <p style={{fontSize:12,color:"var(--gray-600)",lineHeight:1.5}}>
+          <strong>Pre-approval vs. pre-qualification:</strong> Not sure of the difference? Click the icon.
+        </p>
+      </div>
       {d.financeType!=="cash" && d.preApproved===true && (
         <div style={{marginTop:16}}>
           {preApprovalPath || preApprovalLocalFile ? (
@@ -1198,6 +1205,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 12: Escalation clause ─────────────────────────────────────
   if (step===12) return (
     <Q title="Do you want an escalation clause?"
+      titleTip={TIPS.escalationClause}
       subtitle="If another buyer makes a higher offer, should yours automatically increase?"
       helper="An escalation clause says: 'I'll beat any other legitimate offer by $X, up to a maximum of $Y.' For example, you might offer $492K and escalate in $2,500 increments up to $510K. This lets you stay competitive without revealing your maximum upfront. It only triggers if there's a real competing offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -1221,7 +1229,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
               </div>
             </div>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Up to my maximum</label>
+              <label style={{display:"flex",alignItems:"center",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+                Up to my maximum (cap)<TermTip tip={TIPS.escalationCap}/>
+              </label>
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--gray-400)",fontSize:13}}>$</span>
                 <input type="number" value={d.escMax} onChange={e=>set("escMax",+e.target.value)}
@@ -1247,6 +1257,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 13: Seller credits ─────────────────────────────────────────
   if (step===13) return (
     <Q title="Are you requesting any seller credits?"
+      titleTip={TIPS.sellerCredits}
       subtitle="Seller credits reduce your closing costs — the seller pays some of your fees."
       helper="Closing costs typically run 2–5% of the loan amount. You can ask the seller to cover some of these costs ('seller concessions'). This is more common in slower markets or when a home has been listed a while. In a very competitive market, asking for credits may weaken your offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>

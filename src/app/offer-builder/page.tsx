@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
+import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { track } from "@/lib/analytics";
 import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
@@ -44,6 +45,76 @@ type D = {
 ───────────────────────────────────────────────── */
 
 const fmt = (n:number) => "$"+n.toLocaleString();
+
+/* ─────────────────────────────────────────────────
+   TERM TIP — plain-English inline explainer
+   Usage: <TermTip tip="Your plain-English explanation here." />
+   Renders an ℹ icon that opens a popover on click/hover.
+───────────────────────────────────────────────── */
+function TermTip({ tip }: { tip: string }) {
+  return (
+    <Popover style={{ display: "inline-block", position: "relative", verticalAlign: "middle" }}>
+      <PopoverButton
+        aria-label="What does this mean?"
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 18, height: 18, borderRadius: "50%",
+          background: "var(--blue-light)", border: "1.5px solid #bfdbfe",
+          color: "var(--blue)", cursor: "pointer", padding: 0,
+          marginLeft: 6, flexShrink: 0, lineHeight: 1,
+        }}>
+        <Info style={{ width: 10, height: 10 }} />
+      </PopoverButton>
+      <PopoverPanel
+        style={{
+          position: "absolute", zIndex: 100, bottom: "calc(100% + 8px)", left: "50%",
+          transform: "translateX(-50%)", width: 260,
+          background: "#1e293b", color: "#f1f5f9",
+          borderRadius: 10, padding: "10px 14px",
+          fontSize: 12, lineHeight: 1.6, fontWeight: 400,
+          boxShadow: "0 8px 24px -4px rgba(0,0,0,0.35)",
+          pointerEvents: "none",
+        }}>
+        {tip}
+        {/* Arrow */}
+        <span style={{
+          position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+          width: 0, height: 0,
+          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+          borderTop: "6px solid #1e293b",
+        }} />
+      </PopoverPanel>
+    </Popover>
+  );
+}
+
+/* Plain-English tip text for each term */
+const TIPS = {
+  inspectionContingency:
+    "This lets you back out of the deal — and get your deposit back — if a professional home inspector finds serious problems like a bad roof, foundation cracks, or faulty wiring.",
+  financingContingency:
+    "Even with a pre-approval, loans can fall through. This clause lets you walk away and keep your deposit if your mortgage is denied before closing.",
+  appraisalContingency:
+    "Your lender will hire an appraiser to confirm the home's value. If the appraisal comes in lower than your offer, this clause lets you renegotiate the price or back out without losing your deposit.",
+  earnestMoney:
+    "This is a good-faith deposit — usually 1–3% of the purchase price — that you pay when your offer is accepted. It shows the seller you're serious. It gets applied to your down payment at closing, but you could lose it if you back out for a reason not covered by your contingencies.",
+  closingDate:
+    "The closing date is the day you officially become the owner and get the keys. It's typically 30–45 days after your offer is accepted, giving time for inspections, appraisal, and your lender to finalize the loan.",
+  escalationClause:
+    "This tells the seller: 'I'll automatically beat any competing offer by $X, up to a maximum I set.' It keeps you competitive without revealing your top dollar upfront. It only kicks in if there's a real competing offer.",
+  escalationCap:
+    "This is the most you're willing to pay — your absolute ceiling. The escalation clause won't push your price above this number no matter how many competing offers there are.",
+  asIs:
+    "Buying 'as-is' means you accept the home in its current condition. The seller won't make repairs. It's riskier, but can appeal to sellers who don't want the hassle of fixing things before closing.",
+  preApproval:
+    "A pre-approval means a lender has reviewed your income, credit, and assets and agreed to loan you up to a set amount. It's much stronger than a pre-qualification, which is just a rough estimate. Sellers take pre-approvals seriously.",
+  preQualification:
+    "A pre-qualification is a quick, informal estimate of how much you might be able to borrow — usually just based on self-reported income. It carries less weight than a full pre-approval because the lender hasn't verified anything yet.",
+  sellerCredits:
+    "Seller credits (also called seller concessions) are when the seller agrees to pay some of your closing costs at settlement. This can save you thousands upfront, but asking for credits may weaken your offer in a competitive market.",
+  downPayment:
+    "Your down payment is the portion of the purchase price you pay upfront in cash. The bank covers the rest with a mortgage. Putting down 20% or more avoids Private Mortgage Insurance (PMI), which adds $100–300/month to your payment.",
+};
 
 const INITIAL_D: D = {
   buyerType:"", state:"", firstTime:false,
@@ -622,11 +693,13 @@ export default function OfferBuilderPage() {
 ───────────────────────────────────────────────── */
 type SetFn = <K extends keyof D>(k:K,v:D[K])=>void;
 
-function Q({ title, subtitle, helper, children, showHelper, toggleHelper }:
-  { title:string; subtitle?:string; helper?:string; children:React.ReactNode; showHelper?:boolean; toggleHelper?:()=>void }) {
+function Q({ title, subtitle, helper, children, showHelper, toggleHelper, titleTip }:
+  { title:string; subtitle?:string; helper?:string; children:React.ReactNode; showHelper?:boolean; toggleHelper?:()=>void; titleTip?:string }) {
   return (
     <div>
-      <h1 style={{fontSize:26,fontWeight:700,color:"var(--gray-900)",lineHeight:1.25,marginBottom:subtitle?8:24}}>{title}</h1>
+      <h1 style={{fontSize:26,fontWeight:700,color:"var(--gray-900)",lineHeight:1.25,marginBottom:subtitle?8:24,display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
+        {title}{titleTip && <TermTip tip={titleTip}/>}
+      </h1>
       {subtitle && <p style={{fontSize:15,color:"var(--gray-500)",marginBottom:24,lineHeight:1.6}}>{subtitle}</p>}
       {helper && toggleHelper && (
         <div style={{marginBottom:20}}>
@@ -736,6 +809,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 2: Pre-approval ────────────────────────────────────────────
   if (step===2) return (
     <Q title="Do you have a mortgage pre-approval?"
+      titleTip={TIPS.preApproval}
       subtitle="This is one of the most important things sellers look at."
       helper="A pre-approval letter from a lender shows the seller you've already been approved for a loan up to a certain amount. It's different from a pre-qualification — sellers take pre-approvals much more seriously. If you're paying all cash, select that option instead."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -941,6 +1015,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     );
     return (
       <Q title="How much are you putting down?"
+        titleTip={TIPS.downPayment}
         subtitle="A larger down payment signals financial strength to sellers."
         helper="Your down payment is the percentage of the home price you pay upfront. The rest is covered by your mortgage. 20% down eliminates Private Mortgage Insurance (PMI), which can add $100–300/month to your payment."
         showHelper={showHelper} toggleHelper={toggleHelper}>

@@ -8,6 +8,7 @@ import {
   Text,
   View,
   StyleSheet,
+  Image,
 } from "@react-pdf/renderer";
 
 /* ─────────────────────────────────────────────────
@@ -37,6 +38,9 @@ export type OfferTerms = {
   sellerCredits?: number;
   personalLetter?: boolean | null;
   personalLetterText?: string;
+  signatureDataUrl?: string;
+  signatureDate?: string;
+  signatureName?: string;
 };
 
 export type OfferRow = {
@@ -100,6 +104,18 @@ function fmtBuyerType(bt: string): string {
     case "experienced": return "Experienced Buyer";
     case "investor": return "Real Estate Investor";
     default: return bt;
+  }
+}
+
+function fmtSignatureDate(isoDate: string): string {
+  try {
+    const d = new Date(isoDate);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  } catch {
+    return isoDate;
   }
 }
 
@@ -256,6 +272,93 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 1.8,
     color: colors.gray700,
+  },
+  // Signature page
+  signaturePage: {
+    fontFamily: "Helvetica",
+    fontSize: 10,
+    color: colors.gray700,
+    paddingTop: 64,
+    paddingBottom: 64,
+    paddingLeft: 64,
+    paddingRight: 64,
+    lineHeight: 1.5,
+  },
+  signatureTitle: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    color: colors.gray900,
+    marginBottom: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray300,
+    borderBottomStyle: "solid",
+  },
+  signatureSubtitle: {
+    fontSize: 10,
+    color: colors.gray500,
+    marginBottom: 24,
+  },
+  signatureImageBox: {
+    border: "1pt solid #cbd5e1",
+    borderRadius: 4,
+    padding: 8,
+    backgroundColor: "#ffffff",
+    marginBottom: 12,
+    width: 280,
+  },
+  signatureImage: {
+    width: 264,
+    height: 88,
+  },
+  signatureMetaRow: {
+    flexDirection: "row",
+    marginBottom: 6,
+  },
+  signatureMetaLabel: {
+    fontSize: 9,
+    color: colors.gray500,
+    width: 80,
+  },
+  signatureMetaValue: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    color: colors.gray900,
+    flex: 1,
+  },
+  sellerSignatureSection: {
+    marginTop: 32,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray300,
+    borderTopStyle: "solid",
+  },
+  sellerSignatureLabel: {
+    fontSize: 8,
+    color: colors.gray500,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 20,
+  },
+  sellerSignatureLine: {
+    flexDirection: "row",
+    gap: 32,
+    marginTop: 8,
+  },
+  sellerSignatureField: {
+    flex: 1,
+  },
+  sellerSignatureUnderline: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray700,
+    borderBottomStyle: "solid",
+    height: 24,
+    marginBottom: 4,
+  },
+  sellerSignatureFieldLabel: {
+    fontSize: 8,
+    color: colors.gray500,
   },
   // Escalation addendum page
   addendumPage: {
@@ -607,6 +710,63 @@ export function OfferSummaryPdf({ offer, property }: OfferSummaryPdfProps) {
           </View>
         </Page>
       )}
+
+      {/* ── Buyer Signature Page ── */}
+      <Page size="LETTER" style={styles.signaturePage}>
+        <Text style={styles.signatureTitle}>Buyer Signature</Text>
+        <Text style={styles.signatureSubtitle}>
+          Electronic signature for offer on {fullAddress}
+        </Text>
+
+        {/* Buyer signature */}
+        <Text style={{ fontSize: 9, color: colors.gray500, fontFamily: "Helvetica-Bold", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>
+          Buyer
+        </Text>
+        {t.signatureDataUrl ? (
+          <View style={styles.signatureImageBox}>
+            <Image style={styles.signatureImage} src={t.signatureDataUrl} />
+          </View>
+        ) : (
+          <View style={{ ...styles.signatureImageBox, height: 88, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ fontSize: 9, color: colors.gray500 }}>No signature provided</Text>
+          </View>
+        )}
+
+        <View style={styles.signatureMetaRow}>
+          <Text style={styles.signatureMetaLabel}>Buyer:</Text>
+          <Text style={styles.signatureMetaValue}>{t.signatureName || "—"}</Text>
+        </View>
+        <View style={styles.signatureMetaRow}>
+          <Text style={styles.signatureMetaLabel}>Date:</Text>
+          <Text style={styles.signatureMetaValue}>
+            {t.signatureDate ? fmtSignatureDate(t.signatureDate) : "—"}
+          </Text>
+        </View>
+
+        {/* Seller signature section */}
+        <View style={styles.sellerSignatureSection}>
+          <Text style={styles.sellerSignatureLabel}>Seller (to complete upon receipt)</Text>
+          <View style={styles.sellerSignatureLine}>
+            <View style={styles.sellerSignatureField}>
+              <View style={styles.sellerSignatureUnderline} />
+              <Text style={styles.sellerSignatureFieldLabel}>Seller: ___________________</Text>
+            </View>
+            <View style={{ width: 140 }}>
+              <View style={styles.sellerSignatureUnderline} />
+              <Text style={styles.sellerSignatureFieldLabel}>Date: ___________</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.footer} fixed>
+          <Text style={styles.footerText}>
+            HomeOfferDirect — Signature Page · Offer ID: {offer.id}
+          </Text>
+          <Text style={styles.footerText}>
+            HomeOfferDirect is not a law firm.
+          </Text>
+        </View>
+      </Page>
     </Document>
   );
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
+import SignatureCanvas from "react-signature-canvas";
 import { track } from "@/lib/analytics";
 import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
@@ -21,9 +22,10 @@ const SECTIONS = [
   { id:"timeline", label:"Timeline",       steps:[8,9] },
   { id:"protect",  label:"Contingencies",  steps:[10,11,12] },
   { id:"terms",    label:"Extra Terms",    steps:[13,14] },
-  { id:"review",   label:"Review & Send",  steps:[15,16] },
+  { id:"sign",     label:"Sign",           steps:[15] },
+  { id:"review",   label:"Review & Send",  steps:[16,17] },
 ];
-const TOTAL = 17;
+const TOTAL = 18;
 
 type D = {
   buyerType:string; state:string; firstTime:boolean;
@@ -38,6 +40,9 @@ type D = {
   sellerCredits:number;
   personalLetter:boolean|null;
   personalLetterText:string;
+  signatureDataUrl:string;
+  signatureDate:string;
+  signatureName:string;
 };
 
 /* ─────────────────────────────────────────────────
@@ -129,6 +134,9 @@ const INITIAL_D: D = {
   sellerCredits:-1,
   personalLetter:null,
   personalLetterText:"",
+  signatureDataUrl:"",
+  signatureDate:"",
+  signatureName:"",
 };
 
 /* ─────────────────────────────────────────────────
@@ -151,6 +159,7 @@ function canContinue(step:number, d:D): boolean {
     case 12: return d.escalation !== null;
     case 13: return d.sellerCredits !== -1;
     case 14: return d.personalLetter !== null;
+    case 15: return d.signatureDataUrl !== "" && d.signatureName.trim() !== "";
     default: return true;
   }
 }
@@ -231,6 +240,9 @@ function OfferBuilderInner() {
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Signature canvas ref
+  const sigCanvasRef = useRef<SignatureCanvas>(null);
 
   // Pre-approval upload state
   const [preApprovalPath, setPreApprovalPath] = useState<string | null>(null);
@@ -426,6 +438,29 @@ function OfferBuilderInner() {
   const activeSection = SECTIONS.find(s => s.steps.includes(step));
 
   const next = () => {
+    // If leaving the signature step, capture the canvas data first
+    if (step === 15) {
+      const canvas = sigCanvasRef.current;
+      if (canvas && !canvas.isEmpty()) {
+        const dataUrl = canvas.toDataURL("image/png");
+        const updatedD = { ...d, signatureDataUrl: dataUrl, signatureDate: new Date().toISOString() };
+        setD(updatedD);
+        if (!canContinue(step, updatedD)) {
+          setHint(true);
+          setTimeout(() => setHint(false), 3000);
+          return;
+        }
+        const nextStep = Math.min(TOTAL - 1, step + 1);
+        setStep(nextStep);
+        track({ event: "offer_builder_step_completed", step, step_name: activeSection?.label ?? "" });
+        setShowHelper(false);
+        setHint(false);
+        if (nextStep >= 1) {
+          upsertOfferToSupabase(nextStep, updatedD, supabaseOfferId.current);
+        }
+        return;
+      }
+    }
     if (!canContinue(step, d)) {
       setHint(true);
       setTimeout(() => setHint(false), 3000);
@@ -461,7 +496,9 @@ function OfferBuilderInner() {
       <div style={{textAlign:"center"}}>
         <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
         {hint && (
-          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>Select an option to continue</p>
+          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>
+            {step === 15 ? "Please sign and enter your printed name to continue" : "Select an option to continue"}
+          </p>
         )}
       </div>
 
@@ -565,7 +602,8 @@ function OfferBuilderInner() {
         <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
             <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
-              preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}/>
+              preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}
+              sigCanvasRef={sigCanvasRef as React.RefObject<SignatureCanvas>}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -740,9 +778,10 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
 }
 
 function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
-  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload }:
+  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef }:
   { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void;
-    preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void> }) {
+    preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void>;
+    sigCanvasRef: React.RefObject<SignatureCanvas> }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -1311,8 +1350,93 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     </Q>
   );
 
-  // ── Step 15: Review ─────────────────────────────────────────────────
+  // ── Step 15: Sign your offer ────────────────────────────────────────
   if (step===15) {
+    const hasSig = d.signatureDataUrl !== "";
+    return (
+      <Q title="Sign your offer" subtitle="Draw your signature below to authorize this offer.">
+        {/* Canvas signature pad */}
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:8}}>
+            Sign here
+          </label>
+          <div style={{
+            border:"2px solid var(--gray-300)",borderRadius:10,overflow:"hidden",
+            background:"#fff",position:"relative",cursor:"crosshair",
+          }}>
+            <SignatureCanvas
+              ref={sigCanvasRef}
+              canvasProps={{width:500,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
+              backgroundColor="#ffffff"
+              penColor="#1e293b"
+              onEnd={() => {
+                const canvas = sigCanvasRef.current;
+                if (canvas && !canvas.isEmpty()) {
+                  set("signatureDataUrl", canvas.toDataURL("image/png"));
+                  set("signatureDate", new Date().toISOString());
+                }
+              }}
+            />
+            {/* Baseline guide */}
+            <div style={{position:"absolute",bottom:36,left:16,right:16,borderBottom:"1px dashed var(--gray-300)",pointerEvents:"none"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+            <p style={{fontSize:12,color:"var(--gray-400)"}}>
+              {hasSig ? "Signature captured" : "Draw your signature in the box above"}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                sigCanvasRef.current?.clear();
+                set("signatureDataUrl","");
+                set("signatureDate","");
+              }}
+              style={{fontSize:12,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6,fontWeight:500}}>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Printed name */}
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+            Printed full name
+          </label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Your legal full name"
+            value={d.signatureName}
+            onChange={e=>set("signatureName",e.target.value)}
+          />
+        </div>
+
+        {/* Validation message */}
+        {(!hasSig || d.signatureName.trim()==="") && (
+          <div className="warn-box" style={{marginTop:8}}>
+            <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>
+              {!hasSig && d.signatureName.trim()===""
+                ? "Please draw your signature and enter your printed name to continue."
+                : !hasSig
+                  ? "Please draw your signature to continue."
+                  : "Please enter your printed name to continue."}
+            </p>
+          </div>
+        )}
+
+        {hasSig && d.signatureName.trim()!=="" && (
+          <div className="good-box">
+            <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>
+              Signature captured for <strong>{d.signatureName}</strong>. Click Continue to review your offer.
+            </p>
+          </div>
+        )}
+      </Q>
+    );
+  }
+
+  // ── Step 16: Review ─────────────────────────────────────────────────
+  if (step===16) {
     const rows = [
       {section:"Property",   items:[["Address",`${property.address}, ${property.city}, ${property.state}`],["List price",fmt(property.price)]]},
       {section:"Your Offer", items:[["Offer price",fmt(d.offerPrice)],["vs. asking price",d.offerPrice>=property.price?`+${fmt(d.offerPrice-property.price)} above`:`-${fmt(property.price-d.offerPrice)} below`],["Earnest money",`${d.earnestPct}% · ${fmt(Math.round(d.offerPrice*d.earnestPct/100))}`]]},
@@ -1320,6 +1444,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       {section:"Timeline",   items:[["Target closing",`${d.closingDays} days`]]},
       {section:"Contingencies", items:[["Inspection",d.inspectionContingency?`Yes · ${d.inspectionDays} days`:"Waived ⚠️"],["Appraisal",d.appraisalContingency?"Yes":"Waived ⚠️"],["Financing",d.financeType==="cash"?"N/A (cash)":d.financingContingency?`Yes · ${d.financingDays} days`:"Waived ⚠️"]]},
       {section:"Terms",      items:[["Escalation",d.escalation?`Yes · up to ${fmt(d.escMax)}`:"No"],["Seller credits",d.sellerCredits>0?fmt(d.sellerCredits):"None"],["Personal letter",d.personalLetter?"Yes":"No"]]},
+      {section:"Signature",  items:[["Signed by",d.signatureName||"—"],["Signed on",d.signatureDate?new Date(d.signatureDate).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"]]},
     ];
     return (
       <Q title="Review your offer" subtitle="Everything looks good. Confirm before generating your documents.">
@@ -1345,7 +1470,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     );
   }
 
-  // ── Step 16: Submit ─────────────────────────────────────────────────
+  // ── Step 17: Submit ─────────────────────────────────────────────────
   return (
     <Q title="Get your offer package" subtitle="Choose how you'd like to receive and deliver your offer.">
       {[

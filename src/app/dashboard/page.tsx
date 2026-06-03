@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
-import { useAuth, useTierFeatures } from "@/lib/auth-context";
+import { useAuth, useTierFeatures, UserOffer } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { ALL_PROPERTIES } from "@/lib/properties";
 import {
@@ -12,6 +12,47 @@ import {
   ChevronRight, Sparkles, Heart, MapPin, Lock,
   CheckCircle2, Circle, CalendarDays, AlertCircle, ArrowRight, Phone, Mail,
 } from "lucide-react";
+
+/* ── Supabase detection (mirrors auth-context.tsx pattern) ──────────── */
+const SUPABASE_CONFIGURED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+/* ── DB row → UserOffer mapper ──────────────────────────────────────── */
+const STATUS_LABEL: Record<string, string> = {
+  draft:     "Draft",
+  submitted: "Submitted",
+  pending:   "Pending review",
+  accepted:  "Accepted",
+  rejected:  "Not accepted",
+  withdrawn: "Withdrawn",
+};
+
+interface DbOfferRow {
+  id: string;
+  status: string;
+  offer_price: number | null;
+  list_price: number | null;
+  property_address: string | null;
+  address: string | null;
+  created_at: string;
+}
+
+function dbRowToUserOffer(row: DbOfferRow): UserOffer {
+  const resolvedAddress = row.property_address ?? row.address ?? "Address not provided";
+  const statusKey = row.status as UserOffer["status"];
+  return {
+    id: row.id,
+    address: resolvedAddress,
+    price: row.offer_price ?? 0,
+    listPrice: row.list_price ?? 0,
+    status: statusKey,
+    label: STATUS_LABEL[row.status] ?? row.status,
+    date: new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    img: "",
+  };
+}
 
 /* ── Journey milestones ─────────────────────────────────────────── */
 type MilestoneStatus = "done" | "active" | "upcoming";
@@ -47,10 +88,49 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const features = useTierFeatures();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [dbOffers, setDbOffers] = useState<UserOffer[]>([]);
+  const [offersLoading, setOffersLoading] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [loading, user, router]);
+
+  /* ── Fetch real offers from Supabase when authenticated ─────────── */
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED || !user) return;
+    // TEST_ACCOUNT users have non-UUID ids (e.g. "u-free") — skip Supabase fetch for them
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(user.id)) return;
+
+    let cancelled = false;
+    setOffersLoading(true);
+
+    (async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr");
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data, error } = await supabase
+          .from("offers")
+          .select("id, status, offer_price, list_price, property_address, address, created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!cancelled) {
+          if (!error && data) {
+            setDbOffers((data as DbOfferRow[]).map(dbRowToUserOffer));
+          }
+          setOffersLoading(false);
+        }
+      } catch {
+        if (!cancelled) setOffersLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user]);
 
   if (loading || !user) {
     return (
@@ -61,9 +141,16 @@ export default function DashboardPage() {
   }
 
   const savedHomes = ALL_PROPERTIES.filter(p => user.savedHomeIds.includes(p.id));
-  const pendingCount = user.offers.filter(o => o.status === "pending").length;
-  const draftCount   = user.offers.filter(o => o.status === "draft").length;
-  const totalSaved   = user.offers.reduce((acc, o) => {
+
+  /* Use real DB offers for Supabase-authenticated users, fall back to
+     TEST_ACCOUNTS mock offers for localStorage / test-account sessions. */
+  const UUID_REGEX_DISPLAY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isSupabaseUser = SUPABASE_CONFIGURED && UUID_REGEX_DISPLAY.test(user.id);
+  const activeOffers = isSupabaseUser ? dbOffers : user.offers;
+
+  const pendingCount = activeOffers.filter(o => o.status === "pending").length;
+  const draftCount   = activeOffers.filter(o => o.status === "draft").length;
+  const totalSaved   = activeOffers.reduce((acc, o) => {
     if (o.status !== "rejected" && o.status !== "draft") return acc + Math.max(0, o.listPrice - o.price);
     return acc;
   }, 0);
@@ -77,14 +164,14 @@ export default function DashboardPage() {
     {
       icon: FileText,
       label: "Total Offers",
-      value: user.offers.length > 0 ? String(user.offers.length) : "—",
-      sub: user.offers.length > 0 ? `${pendingCount} pending` : "Start your first offer",
+      value: activeOffers.length > 0 ? String(activeOffers.length) : "—",
+      sub: activeOffers.length > 0 ? `${pendingCount} pending` : "Start your first offer",
     },
     {
       icon: Send,
       label: "Submitted",
-      value: user.offers.filter(o => o.status !== "draft").length > 0
-        ? String(user.offers.filter(o => o.status !== "draft").length)
+      value: activeOffers.filter(o => o.status !== "draft").length > 0
+        ? String(activeOffers.filter(o => o.status !== "draft").length)
         : "—",
       sub: pendingCount > 0 ? `${pendingCount} awaiting response` : "None submitted yet",
     },
@@ -168,17 +255,30 @@ export default function DashboardPage() {
                   View all <ChevronRight className="w-3 h-3" />
                 </button>
               </div>
-              {user.offers.length === 0 ? (
+              {offersLoading ? (
+                <div className="divide-y divide-slate-100">
+                  {[0, 1, 2].map(i => (
+                    <div key={i} className="p-6 flex items-center gap-5 animate-pulse">
+                      <div className="w-16 h-16 rounded-xl bg-slate-200 flex-shrink-0"/>
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3.5 bg-slate-200 rounded w-3/4"/>
+                        <div className="h-5 bg-slate-200 rounded w-1/3"/>
+                        <div className="h-3 bg-slate-200 rounded w-1/4"/>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : activeOffers.length === 0 ? (
                 <div className="p-14 text-center">
                   <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
-                  <p className="text-sm font-medium text-slate-500">No offers yet</p>
-                  <Link href="/offer-builder" className="inline-flex items-center gap-1.5 mt-4 text-sm text-blue-600 font-semibold hover:underline">
-                    Build your first offer <ArrowRight className="w-3.5 h-3.5"/>
+                  <p className="text-sm font-medium text-slate-500">You haven&apos;t started any offers yet</p>
+                  <Link href="/search" className="inline-flex items-center gap-1.5 mt-4 text-sm text-blue-600 font-semibold hover:underline">
+                    Start an offer <ArrowRight className="w-3.5 h-3.5"/>
                   </Link>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100" data-testid="offers-panel">
-                  {user.offers.slice(0, 3).map(o => (
+                  {activeOffers.slice(0, 3).map(o => (
                     <div key={o.id} className="p-6 flex items-center gap-5 hover:bg-slate-50 transition-colors">
                       <div className="w-16 h-16 rounded-xl bg-cover bg-center flex-shrink-0"
                         style={{backgroundImage:`url(${o.img})`}}/>
@@ -243,18 +343,31 @@ export default function DashboardPage() {
         {/* ── Offers tab ── */}
         {activeTab==="offers" && (
           <div className="space-y-6" data-testid="offers-panel">
-            {user.offers.length === 0 ? (
+            {offersLoading ? (
+              <div className="space-y-4">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 flex items-center gap-6 animate-pulse">
+                    <div className="w-20 h-20 rounded-xl bg-slate-200 flex-shrink-0"/>
+                    <div className="flex-1 space-y-3">
+                      <div className="h-4 bg-slate-200 rounded w-2/3"/>
+                      <div className="h-7 bg-slate-200 rounded w-1/3"/>
+                      <div className="h-3 bg-slate-200 rounded w-1/4"/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : activeOffers.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
                 <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3"/>
-                <p className="text-sm font-medium text-slate-500">No offers yet</p>
-                <p className="text-xs text-slate-400 mt-1 mb-4">Start by browsing homes or building an offer directly</p>
-                <Link href="/offer-builder" className="inline-flex items-center gap-1.5 gradient-bg text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90">
-                  Build your first offer <ArrowRight className="w-4 h-4"/>
+                <p className="text-sm font-medium text-slate-500">You haven&apos;t started any offers yet</p>
+                <p className="text-xs text-slate-400 mt-1 mb-4">Browse homes to find your next opportunity</p>
+                <Link href="/search" className="inline-flex items-center gap-1.5 gradient-bg text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90">
+                  Start an offer <ArrowRight className="w-4 h-4"/>
                 </Link>
               </div>
             ) : (
               (["pending","draft","accepted","rejected"] as const).map(status => {
-                const group = user.offers.filter(o => o.status === status);
+                const group = activeOffers.filter(o => o.status === status);
                 if (!group.length) return null;
                 const statusLabel = { pending:"Pending", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted" }[status];
                 return (
@@ -317,7 +430,7 @@ export default function DashboardPage() {
               })
             )}
 
-            {user.offers.length >= features.maxOffers && (
+            {activeOffers.length >= features.maxOffers && (
               <div className="flex items-start gap-3 bg-amber-50 border border-amber-100 rounded-xl p-5">
                 <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0"/>
                 <div className="flex-1">

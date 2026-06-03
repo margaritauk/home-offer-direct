@@ -44,7 +44,8 @@ function SignupContent() {
     setLoading(true);
     try {
       await register(name, email, password, state || "IL");
-      router.push("/dashboard");
+      localStorage.setItem("hod-new-user", "1");
+      router.push("/search?welcome=1");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

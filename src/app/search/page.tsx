@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { useAuth, useTierFeatures } from "@/lib/auth-context";
@@ -21,15 +21,22 @@ const sampleProperties = [
   { id:"6", address:"1234 W Fullerton Ave", city:"Chicago", state:"IL", zip:"60614", price:795000, beds:4, baths:3, sqft:3200, type:"Single Family", dom:8, priceHistory:"same", priceChange:0, photos:["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800"], aiScore:78, aiLabel:"Well-Priced", aiColor:"text-blue-700 bg-blue-50", suggestedOffer:[785000,810000], marketTrend:"hot", listingAgent:"Rachel Bloom", agentPhone:"(312) 555-0761", agentEmail:"r.bloom@sothebys.com", brokerage:"Sotheby's" },
 ];
 
-export default function SearchPage() {
+function SearchContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, saveHome, unsaveHome } = useAuth();
   const features = useTierFeatures();
   const [query, setQuery] = useState("Chicago, IL");
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
   const [priceMin, setPriceMin] = useState("");
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const filteredProperties = sampleProperties.filter(p => {
     const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
@@ -37,6 +44,8 @@ export default function SearchPage() {
     if (p.price < min || p.price > max) return false;
     if (beds !== "any" && p.beds < parseInt(beds, 10)) return false;
     if (propType !== "any" && p.type !== propType) return false;
+    const q = debouncedQuery.trim().toLowerCase();
+    if (q && !p.address.toLowerCase().includes(q) && !p.city?.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -63,6 +72,7 @@ export default function SearchPage() {
               <input type="text" value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="City, ZIP, or address..."
                 className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" />
+              <p className="text-xs text-slate-400 mt-1 pl-1">Showing sample Chicago listings · Enter any property address to build your offer</p>
             </div>
             <div className="flex gap-2">
               <input type="text" value={priceMin} onChange={e => setPriceMin(e.target.value)} placeholder="Min price"
@@ -106,6 +116,15 @@ export default function SearchPage() {
 
       {/* Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {searchParams.get("welcome") === "1" && (
+          <div style={{background:"var(--blue-light)",border:"1px solid #bfdbfe",borderRadius:12,padding:"16px 20px",marginBottom:24,display:"flex",alignItems:"flex-start",gap:12}}>
+            <span style={{fontSize:20}}>🏠</span>
+            <div>
+              <p style={{fontSize:15,fontWeight:600,color:"var(--blue)",marginBottom:4}}>Welcome to HomeOfferDirect!</p>
+              <p style={{fontSize:13,color:"var(--gray-700)",lineHeight:1.6}}>Find a property below to get started on your offer. No agent required.</p>
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-slate-900">{filteredProperties.length} homes for sale in Chicago, IL</h1>
@@ -146,6 +165,14 @@ export default function SearchPage() {
   );
 }
 
+export default function SearchPage() {
+  return (
+    <Suspense>
+      <SearchContent />
+    </Suspense>
+  );
+}
+
 interface Property {
   id: string; address: string; city: string; state: string; zip: string;
   price: number; beds: number; baths: number; sqft: number; type: string;
@@ -168,6 +195,7 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
         </div>
         <button onClick={onToggleSave}
           title={saved ? "Remove from saved" : "Save home"}
+          aria-label={saved ? `Remove ${property.address} from saved` : `Save ${property.address}`}
           className={`absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition-all ${saved ? "bg-red-500 text-white" : "bg-white/90 text-slate-600 hover:bg-white hover:text-red-500"}`}>
           <Heart className={`w-4 h-4 ${saved ? "fill-white" : ""}`} />
         </button>

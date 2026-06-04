@@ -6,12 +6,13 @@ import Navbar from "@/components/layout/Navbar";
 import { useAuth, useTierFeatures, UserOffer } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { ALL_PROPERTIES } from "@/lib/properties";
+import { OFFER_STATUS_LABEL, OFFER_STATUS_COLOR } from "@/lib/offerStatus";
 import {
   FileText, Send, Clock, PlusCircle, Bell, TrendingUp,
   DollarSign, Download, MessageSquare, Bed, Bath,
   ChevronRight, Sparkles, Heart, MapPin, Lock,
   CheckCircle2, Circle, CalendarDays, AlertCircle, ArrowRight, Phone, Mail,
-  PenLine, ShieldCheck, ShieldOff, X, ChevronDown, Upload,
+  PenLine, ShieldCheck, ShieldOff, X, ChevronDown, Upload, Loader2,
 } from "lucide-react";
 
 /* ── Supabase detection (mirrors auth-context.tsx pattern) ──────────── */
@@ -21,16 +22,8 @@ const SUPABASE_CONFIGURED =
   !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 /* ── DB row → UserOffer mapper ──────────────────────────────────────── */
-const STATUS_LABEL: Record<string, string> = {
-  draft:            "Draft",
-  submitted:        "Submitted",
-  pending:          "Pending review",
-  pending_response: "Pending Response",
-  accepted:         "Accepted",
-  rejected:         "Not accepted",
-  withdrawn:        "Withdrawn",
-  counter:          "Counter-offer received",
-};
+// Re-export alias for backwards-compat within this file
+const STATUS_LABEL = OFFER_STATUS_LABEL;
 
 interface DbOfferRow {
   id: string;
@@ -42,6 +35,7 @@ interface DbOfferRow {
   created_at: string;
   terms?: Record<string, unknown> | null;
   notes?: string | null;
+  sent_to_agent_at?: string | null;
 }
 
 /* Extended local offer that carries signature and notes data */
@@ -49,6 +43,7 @@ interface ExtendedOffer extends UserOffer {
   signatureDataUrl?: string;
   signatureDate?: string;
   notes?: string;
+  sentToAgentAt?: string | null;
 }
 
 function formatSignatureDate(isoString: string): string {
@@ -80,6 +75,7 @@ function dbRowToExtendedOffer(row: DbOfferRow): ExtendedOffer {
     signatureDataUrl: (terms.signatureDataUrl as string | undefined) ?? undefined,
     signatureDate: (terms.signatureDate as string | undefined) ?? undefined,
     notes: row.notes ?? undefined,
+    sentToAgentAt: row.sent_to_agent_at ?? null,
   };
 }
 
@@ -124,15 +120,8 @@ const CALENDAR_DATES = [
   { date:"Jun 21", label:"Closing day",               warn:false },
 ];
 
-const STATUS_COLOR: Record<string, string> = {
-  pending:          "text-amber-700 bg-amber-50",
-  pending_response: "bg-blue-100 text-blue-700",
-  draft:            "text-slate-600 bg-slate-100",
-  accepted:         "text-green-700 bg-green-50",
-  rejected:         "text-red-600 bg-red-50",
-  submitted:        "bg-blue-100 text-blue-700",
-  withdrawn:        "bg-slate-100 text-slate-500",
-};
+// Re-export alias for backwards-compat within this file
+const STATUS_COLOR = OFFER_STATUS_COLOR;
 
 /* ── Signed badge helper ────────────────────────────────────────────── */
 function SignedBadge({ offer }: { offer: ExtendedOffer }) {
@@ -180,6 +169,14 @@ interface VerifyState {
   proofError: string | null;
 }
 
+/* ── Send-to-agent state per offer ──────────────────────────────────── */
+type SendAgentState =
+  | { type: "idle" }
+  | { type: "sending" }
+  | { type: "success"; sentTo: string }
+  | { type: "no_agent_email" }
+  | { type: "error"; message: string };
+
 export default function DashboardPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -188,6 +185,8 @@ export default function DashboardPage() {
   const [dbOffers, setDbOffers] = useState<ExtendedOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
   const [statusModal, setStatusModal] = useState<StatusModalState | null>(null);
+  /* Maps offer ID → send-to-agent async state */
+  const [sendAgentState, setSendAgentState] = useState<Record<string, SendAgentState>>({});
 
   /* ── Identity verification state ─────────────────────────────────── */
   const [verifyState, setVerifyState] = useState<VerifyState>({
@@ -226,7 +225,7 @@ export default function DashboardPage() {
         );
         const { data, error } = await supabase
           .from("offers")
-          .select("id, status, offer_price, list_price, property_address, address, created_at, terms, notes")
+          .select("id, status, offer_price, list_price, property_address, address, created_at, terms, notes, sent_to_agent_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false });
 
@@ -431,6 +430,35 @@ export default function DashboardPage() {
     }
   }
 
+  /* ── Send-to-agent handler ──────────────────────────────────────── */
+  async function handleSendToAgent(offerId: string) {
+    setSendAgentState(prev => ({ ...prev, [offerId]: { type: "sending" } }));
+    try {
+      const res = await fetch(`/api/offers/${offerId}/send-to-agent`, { method: "POST" });
+      if (res.status === 422) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        const msg = body.error ?? "";
+        if (msg.toLowerCase().includes("agent") && msg.toLowerCase().includes("email")) {
+          setSendAgentState(prev => ({ ...prev, [offerId]: { type: "no_agent_email" } }));
+        } else {
+          setSendAgentState(prev => ({ ...prev, [offerId]: { type: "error", message: msg || "Validation error." } }));
+        }
+        return;
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        setSendAgentState(prev => ({ ...prev, [offerId]: { type: "error", message: body.error ?? "Failed to send." } }));
+        return;
+      }
+      const data = await res.json() as { success: boolean; sentTo: string };
+      setSendAgentState(prev => ({ ...prev, [offerId]: { type: "success", sentTo: data.sentTo } }));
+      /* Stamp sentToAgentAt optimistically in local state */
+      setDbOffers(prev => prev.map(o => o.id === offerId ? { ...o, sentToAgentAt: new Date().toISOString() } : o));
+    } catch {
+      setSendAgentState(prev => ({ ...prev, [offerId]: { type: "error", message: "Network error. Please try again." } }));
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -567,7 +595,7 @@ export default function DashboardPage() {
             </div>
 
             {!verifyState.verified && (
-              <div className="px-8 pb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="px-4 sm:px-8 pb-4 sm:pb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Government ID upload */}
                 <div>
                   <p className="text-xs font-medium text-slate-600 mb-2">
@@ -976,7 +1004,7 @@ export default function DashboardPage() {
         {activeTab==="journey" && (
           features.journeyTracker ? (
             <div data-testid="journey-panel">
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7 mb-7">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-7 mb-7">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-semibold text-slate-900">Your home buying progress</p>
                   <span className="text-sm font-bold text-blue-600">3 of 8 complete</span>
@@ -992,7 +1020,7 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-7">
                 {MILESTONES.map((m, i) => (
                   <div key={i}
-                    className={`flex items-start gap-5 px-7 py-5 ${i < MILESTONES.length-1 ? "border-b border-slate-50" : ""} ${m.status==="active" ? "bg-blue-50/40" : ""}`}>
+                    className={`flex items-start gap-3 sm:gap-5 px-4 sm:px-7 py-4 sm:py-5 ${i < MILESTONES.length-1 ? "border-b border-slate-50" : ""} ${m.status==="active" ? "bg-blue-50/40" : ""}`}>
                     <div className="mt-0.5 flex-shrink-0">
                       {m.status==="done" ? <CheckCircle2 className="w-5 h-5 text-green-500"/>
                         : m.status==="active" ? <Clock className="w-5 h-5 text-blue-500"/>
@@ -1015,7 +1043,7 @@ export default function DashboardPage() {
                 ))}
               </div>
 
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-7">
                 <div className="flex items-center gap-2 mb-6">
                   <CalendarDays className="w-4 h-4 text-blue-500"/>
                   <p className="text-sm font-semibold text-slate-900">Key contract dates</p>

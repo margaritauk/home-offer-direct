@@ -263,13 +263,13 @@ function SearchContent() {
             </div>
             <div className="flex gap-2">
               <input type="text" value={priceMin} onChange={e => setPriceMin(e.target.value)} placeholder="Min price"
-                className="w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                className="w-full sm:w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
               <input type="text" value={priceMax} onChange={e => setPriceMax(e.target.value)} placeholder="Max price"
-                className="w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                className="w-full sm:w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="relative">
               <select value={beds} onChange={e => setBeds(e.target.value)}
-                className="appearance-none pl-4 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
+                className="w-full appearance-none pl-4 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
                 <option value="any">Any beds</option>
                 <option value="1">1+ bd</option>
                 <option value="2">2+ bd</option>
@@ -278,13 +278,13 @@ function SearchContent() {
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white">
+            <button className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white min-h-[44px]">
               <SlidersHorizontal className="w-4 h-4" /> Filters
             </button>
             <div className="relative" ref={popoverRef}>
               <button
                 onClick={handleOpenSavePopover}
-                className="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white min-h-[44px]"
               >
                 <Bookmark className="w-4 h-4" /> Save search
               </button>
@@ -318,7 +318,7 @@ function SearchContent() {
                 </div>
               )}
             </div>
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm">
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm min-h-[44px]">
               <Search className="w-4 h-4" /> Search
             </button>
           </div>
@@ -356,14 +356,14 @@ function SearchContent() {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-slate-900">
               {propertiesLoading ? "Loading homes..." : `${filteredProperties.length} homes for sale in Chicago, IL`}
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">Updated {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric"})}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
               <Sparkles className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-medium text-blue-700">AI insights enabled</span>

@@ -755,6 +755,42 @@ export default function DashboardPage() {
                             Continue
                           </Link>
                         )}
+                        {/* Send to agent — overview compact button */}
+                        {o.status==="submitted" && !!o.signatureDataUrl && (() => {
+                          const sas = sendAgentState[o.id];
+                          if (o.sentToAgentAt && !sas) {
+                            return (
+                              <span title="Already sent to agent" className="p-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5"/>
+                              </span>
+                            );
+                          }
+                          if (!sas || sas.type === "idle" || sas.type === "error") {
+                            return (
+                              <button
+                                onClick={() => handleSendToAgent(o.id)}
+                                title={sas?.type === "error" ? `Retry: ${sas.message}` : "Send to listing agent"}
+                                className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+                                <Mail className="w-3.5 h-3.5"/>
+                              </button>
+                            );
+                          }
+                          if (sas.type === "sending") {
+                            return (
+                              <span className="p-1.5 bg-blue-50 text-blue-400 rounded-lg flex items-center gap-1">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin"/>
+                              </span>
+                            );
+                          }
+                          if (sas.type === "success") {
+                            return (
+                              <span title={`Sent to ${sas.sentTo}`} className="p-1.5 bg-green-50 text-green-600 border border-green-200 rounded-lg flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5"/>
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         <button
                           onClick={() => openStatusModal(o)}
                           title="Update status"
@@ -891,6 +927,61 @@ export default function DashboardPage() {
                                   <PlusCircle className="w-4 h-4"/> New Offer on This Property
                                 </Link>
                               )}
+                              {/* Send to agent button — submitted + signed offers */}
+                              {offer.status==="submitted" && !!offer.signatureDataUrl && (() => {
+                                const sas = sendAgentState[offer.id];
+                                const alreadySent = offer.sentToAgentAt;
+                                if (alreadySent && !sas) {
+                                  return (
+                                    <span className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-green-50 text-green-700 rounded-xl font-semibold border border-green-200">
+                                      <CheckCircle2 className="w-4 h-4"/> Sent to agent
+                                    </span>
+                                  );
+                                }
+                                if (!sas || sas.type === "idle") {
+                                  return (
+                                    <button
+                                      onClick={() => handleSendToAgent(offer.id)}
+                                      className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold transition-colors">
+                                      <Mail className="w-4 h-4"/> Send to agent
+                                    </button>
+                                  );
+                                }
+                                if (sas.type === "sending") {
+                                  return (
+                                    <button disabled className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-blue-400 text-white rounded-xl font-semibold opacity-75">
+                                      <Loader2 className="w-4 h-4 animate-spin"/> Sending…
+                                    </button>
+                                  );
+                                }
+                                if (sas.type === "success") {
+                                  return (
+                                    <span className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-green-50 text-green-700 rounded-xl font-semibold border border-green-200">
+                                      <CheckCircle2 className="w-4 h-4"/> Sent to {sas.sentTo}
+                                    </span>
+                                  );
+                                }
+                                if (sas.type === "no_agent_email") {
+                                  return (
+                                    <Link
+                                      href={`/offer-builder?id=${offer.id}&step=15`}
+                                      className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-amber-50 text-amber-700 rounded-xl font-semibold border border-amber-200 hover:bg-amber-100">
+                                      <Mail className="w-4 h-4"/> Add agent email
+                                    </Link>
+                                  );
+                                }
+                                if (sas.type === "error") {
+                                  return (
+                                    <button
+                                      onClick={() => handleSendToAgent(offer.id)}
+                                      title={sas.message}
+                                      className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-red-50 text-red-600 rounded-xl font-semibold border border-red-200 hover:bg-red-100">
+                                      <AlertCircle className="w-4 h-4"/> Retry send
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {/* Update status button */}
                               <button
                                 onClick={() => openStatusModal(offer)}

@@ -14,11 +14,16 @@ const fmt = (n: number) => "$" + n.toLocaleString();
 /**
  * Generates a short HMAC-style token for the mark-followed-up link.
  * Token = first 16 hex chars of sha256(offerId + CRON_SECRET).
+ *
+ * @param offerId - The offer ID to generate the token for.
+ * @param secret  - The CRON_SECRET to use. Falls back to the env var when
+ *                  omitted (for use in email-sending paths where the caller
+ *                  hasn't pre-validated the secret).
  */
-export function generateFollowUpToken(offerId: string): string {
-  const secret = process.env.CRON_SECRET ?? "";
+export function generateFollowUpToken(offerId: string, secret?: string): string {
+  const resolvedSecret = secret ?? process.env.CRON_SECRET ?? "";
   return createHash("sha256")
-    .update(offerId + secret)
+    .update(offerId + resolvedSecret)
     .digest("hex")
     .slice(0, 16);
 }

@@ -8,6 +8,7 @@
  * Token = first 16 hex chars of sha256(offerId + CRON_SECRET).
  */
 
+import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import { generateFollowUpToken } from "@/lib/email/sendFollowUpReminder";
@@ -16,6 +17,11 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
+  }
+
   const { id } = await params;
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
@@ -27,9 +33,11 @@ export async function GET(
     return NextResponse.redirect(`${appUrl}/dashboard?error=invalid_link`);
   }
 
-  // Validate token
-  const expectedToken = generateFollowUpToken(id);
-  if (token !== expectedToken) {
+  // Validate token using timing-safe comparison
+  const expected = generateFollowUpToken(id, secret);
+  const tokenBuf = Buffer.from(token);
+  const expectedBuf = Buffer.from(expected);
+  if (tokenBuf.length !== expectedBuf.length || !timingSafeEqual(tokenBuf, expectedBuf)) {
     return NextResponse.redirect(`${appUrl}/dashboard?error=invalid_token`);
   }
 

@@ -1,0 +1,1 @@
+ALTER TABLE public.offers ADD COLUMN IF NOT EXISTS sent_to_agent_at TIMESTAMPTZ;

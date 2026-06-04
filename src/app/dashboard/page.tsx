@@ -506,29 +506,29 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24">
 
         {/* Welcome header */}
-        <div className="flex items-center justify-between mb-12">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
+        <div className="flex items-center justify-between gap-4 mb-12">
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 truncate">
               Welcome back, {user.name.split(" ")[0]}
             </h1>
-            <p className="text-slate-500 mt-2">{headerSub}</p>
+            <p className="text-slate-500 mt-1 sm:mt-2 text-sm">{headerSub}</p>
           </div>
           <Link href="/offer-builder"
-            className="flex items-center gap-2 gradient-bg text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm">
-            <PlusCircle className="w-4 h-4" /> New Offer
+            className="flex items-center gap-2 gradient-bg text-white font-semibold px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm flex-shrink-0">
+            <PlusCircle className="w-4 h-4" /> <span className="hidden sm:inline">New </span>Offer
           </Link>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-12">
           {stats.map(({ icon: Icon, label, value, sub }) => (
-            <div key={label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-7">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-5">
-                <Icon className="w-5 h-5 text-blue-600" />
+            <div key={label} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-7">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-3 sm:mb-5">
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
-              <p className="text-2xl font-black text-slate-900 mb-2">{value}</p>
-              <p className="text-sm font-medium text-slate-700">{label}</p>
-              <p className="text-xs text-slate-400 mt-2">{sub}</p>
+              <p className="text-xl sm:text-2xl font-black text-slate-900 mb-1 sm:mb-2">{value}</p>
+              <p className="text-xs sm:text-sm font-medium text-slate-700">{label}</p>
+              <p className="text-xs text-slate-400 mt-1 sm:mt-2">{sub}</p>
             </div>
           ))}
         </div>
@@ -536,7 +536,7 @@ export default function DashboardPage() {
         {/* ── Verify Your Identity card ── */}
         {isSupabaseUser && (
           <div className={`mb-8 rounded-2xl border shadow-sm overflow-hidden ${verifyState.verified ? "border-green-200 bg-green-50" : "border-slate-100 bg-white"}`}>
-            <div className="px-8 py-5 flex items-center gap-4">
+            <div className="px-4 sm:px-8 py-4 sm:py-5 flex items-center gap-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${verifyState.verified ? "bg-green-100" : "bg-blue-50"}`}>
                 <ShieldCheck className={`w-5 h-5 ${verifyState.verified ? "text-green-600" : "text-blue-600"}`} />
               </div>
@@ -655,11 +655,11 @@ export default function DashboardPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 w-fit" data-testid="tabs">
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 overflow-x-auto" data-testid="tabs">
           {(["overview","offers","saved","journey"] as Tab[]).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               data-testid={`tab-${tab}`}
-              className={`px-6 py-2.5 rounded-lg text-sm font-medium capitalize transition-all flex items-center gap-1.5 ${activeTab===tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+              className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm font-medium capitalize transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab===tab ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
               {tab==="journey" && !features.journeyTracker && <Lock className="w-3 h-3"/>}
               {tab==="journey" ? "My Journey" : tab}
             </button>
@@ -670,7 +670,7 @@ export default function DashboardPage() {
         {activeTab==="overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-8 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="font-semibold text-slate-900">Recent Offers</h2>
                 <button onClick={() => setActiveTab("offers")}
                   className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1">
@@ -701,7 +701,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="divide-y divide-slate-100" data-testid="offers-panel">
                   {activeOffers.slice(0, 3).map(o => (
-                    <div key={o.id} className="p-6 flex items-center gap-5 hover:bg-slate-50 transition-colors">
+                    <div key={o.id} className="p-4 sm:p-6 flex items-center gap-3 sm:gap-5 hover:bg-slate-50 transition-colors">
                       <div className="w-16 h-16 rounded-xl bg-cover bg-center flex-shrink-0"
                         style={{backgroundImage:`url(${o.img})`}}/>
                       <div className="flex-1 min-w-0">
@@ -751,14 +751,14 @@ export default function DashboardPage() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-8 py-5 border-b border-slate-100">
+              <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
                 <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
               </div>
               <div className="divide-y divide-slate-100">
                 {AI_RECS.map(rec => {
                   const Icon = rec.icon;
                   return (
-                    <div key={rec.title} className="p-7">
+                    <div key={rec.title} className="p-4 sm:p-7">
                       <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
                         <Icon className="w-4 h-4" />
                       </div>
@@ -782,8 +782,8 @@ export default function DashboardPage() {
             {offersLoading ? (
               <div className="space-y-4">
                 {[0, 1, 2].map(i => (
-                  <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 flex items-center gap-6 animate-pulse">
-                    <div className="w-20 h-20 rounded-xl bg-slate-200 flex-shrink-0"/>
+                  <div key={i} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-8 flex items-center gap-4 sm:gap-6 animate-pulse">
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-slate-200 flex-shrink-0"/>
                     <div className="flex-1 space-y-3">
                       <div className="h-4 bg-slate-200 rounded w-2/3"/>
                       <div className="h-7 bg-slate-200 rounded w-1/3"/>
@@ -811,8 +811,8 @@ export default function DashboardPage() {
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">{statusLabel}</h3>
                     <div className="space-y-4">
                       {group.map(offer => (
-                        <div key={offer.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 flex items-center gap-6">
-                          <div className="w-20 h-20 rounded-xl bg-cover bg-center flex-shrink-0"
+                        <div key={offer.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                          <div className="w-full h-32 sm:w-20 sm:h-20 rounded-xl bg-cover bg-center flex-shrink-0"
                             style={{backgroundImage:`url(${offer.img})`}}/>
                           <div className="flex-1">
                             <div className="flex items-start justify-between flex-wrap gap-2">
@@ -845,7 +845,7 @@ export default function DashboardPage() {
                                 <span className="font-medium text-slate-700">Notes: </span>{offer.notes}
                               </p>
                             )}
-                            <div className="flex items-center gap-3 mt-6 flex-wrap">
+                            <div className="flex items-center gap-2 sm:gap-3 mt-4 sm:mt-6 flex-wrap">
                               {offer.status==="draft" && (
                                 <Link href="/offer-builder"
                                   className="flex items-center gap-1.5 text-sm px-5 py-2.5 gradient-bg text-white rounded-xl font-semibold hover:opacity-90">

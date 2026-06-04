@@ -49,7 +49,7 @@ export function scoreOffer(input: ScoringInput): ScoringResult {
     priceTip = "Offering at or slightly above asking is solid. Bidding 5%+ over list maximises acceptance odds in competitive markets.";
   } else if (pricePct >= -0.04) {
     pricePoints = 12;
-    priceTip = "Offering at list price or above significantly improves acceptance odds.";
+    priceTip = "You're slightly below asking — offering at or above list price significantly improves acceptance odds.";
   } else if (pricePct >= -0.09) {
     pricePoints = 5;
     priceTip = "Your offer is meaningfully below asking. Consider closing the gap to be more competitive.";

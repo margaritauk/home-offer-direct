@@ -1,7 +1,8 @@
 export const runtime = "nodejs";
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createElement } from "react";
 import { OfferSummaryPdf } from "@/components/pdf/OfferSummaryPdf";
@@ -81,11 +82,22 @@ export async function GET(
   const { renderToBuffer } = require("@react-pdf/renderer") as any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const element = createElement(OfferSummaryPdf, { offer, property, isVerified }) as any;
-  const pdfBuffer: Buffer = await renderToBuffer(element);
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await renderToBuffer(element);
+  } catch (err) {
+    console.error('PDF render error', err);
+    return NextResponse.json({ error: 'Failed to generate PDF. Please contact support.' }, { status: 500 });
+  }
 
-  /* ── Upload to Supabase Storage ── */
+  /* ── Upload to Supabase Storage (service role to bypass storage RLS) ── */
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const storagePath = `offer-pdfs/${user.id}/${id}.pdf`;
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await serviceClient.storage
     .from("documents")
     .upload(storagePath, pdfBuffer, {
       contentType: "application/pdf",
@@ -94,12 +106,12 @@ export async function GET(
 
   if (!uploadError) {
     /* ── Persist pdf_url back to the offers row ── */
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = serviceClient.storage
       .from("documents")
       .getPublicUrl(storagePath);
 
     if (urlData?.publicUrl) {
-      await supabase
+      await serviceClient
         .from("offers")
         .update({ pdf_url: urlData.publicUrl })
         .eq("id", id);

@@ -1411,7 +1411,6 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
                 const canvas = sigCanvasRef.current;
                 if (canvas && !canvas.isEmpty()) {
                   set("signatureDataUrl", canvas.toDataURL("image/png"));
-                  set("signatureDate", new Date().toISOString());
                 }
               }}
             />

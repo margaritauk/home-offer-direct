@@ -7,6 +7,7 @@ import { useAuth, useTierFeatures, UserOffer } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { ALL_PROPERTIES } from "@/lib/properties";
 import { OFFER_STATUS_LABEL, OFFER_STATUS_COLOR } from "@/lib/offerStatus";
+import { track } from "@/lib/analytics";
 import {
   FileText, Send, Clock, PlusCircle, Bell, TrendingUp,
   DollarSign, Download, MessageSquare, Bed, Bath,
@@ -122,6 +123,11 @@ const CALENDAR_DATES = [
 
 // Re-export alias for backwards-compat within this file
 const STATUS_COLOR = OFFER_STATUS_COLOR;
+
+/* ── PDF download URL helper ─────────────────────────────────────────── */
+function getOfferPdfHref(offerId: string): string {
+  return `/api/offers/${encodeURIComponent(offerId)}/pdf`;
+}
 
 /* ── Signed badge helper ────────────────────────────────────────────── */
 function SignedBadge({ offer }: { offer: ExtendedOffer }) {
@@ -798,9 +804,11 @@ export default function DashboardPage() {
                           <Send className="w-3.5 h-3.5"/>
                         </button>
                         {features.pdfDownload ? (
-                          <button title="Download PDF" className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                          <a href={getOfferPdfHref(o.id)} target="_blank" rel="noopener noreferrer"
+                            onClick={() => track({ event: "pdf_download_clicked", tier: user?.tier ?? "free" })}
+                            title="Download PDF" className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
                             <Download className="w-3.5 h-3.5" />
-                          </button>
+                          </a>
                         ) : (
                           <Link href="/pricing" title="Upgrade to download PDF"
                             className="p-1.5 bg-slate-50 text-slate-300 border border-slate-100 rounded-lg hover:border-blue-200 hover:text-blue-400 transition-colors">
@@ -989,9 +997,11 @@ export default function DashboardPage() {
                                 <Send className="w-4 h-4"/> Update status
                               </button>
                               {features.pdfDownload ? (
-                                <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">
+                                <a href={getOfferPdfHref(offer.id)} target="_blank" rel="noopener noreferrer"
+                                  onClick={() => track({ event: "pdf_download_clicked", tier: user?.tier ?? "free" })}
+                                  className="flex items-center gap-1.5 text-sm px-5 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-medium hover:bg-slate-50">
                                   <Download className="w-4 h-4"/> Download
-                                </button>
+                                </a>
                               ) : (
                                 <Link href="/pricing"
                                   className="flex items-center gap-1.5 text-sm px-4 py-2 border border-slate-100 text-slate-400 rounded-xl font-medium hover:border-blue-200 hover:text-blue-600">

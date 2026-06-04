@@ -23,4 +23,6 @@ export const OFFER_STATUS_COLOR: Record<string, string> = {
   rejected:         "text-red-600 bg-red-50",
   submitted:        "bg-blue-100 text-blue-700",
   withdrawn:        "bg-slate-100 text-slate-500",
+  counter:          "bg-purple-100 text-purple-700",
+  cancelled:        "bg-gray-100 text-gray-500",
 };

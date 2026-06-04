@@ -636,7 +636,7 @@ function OfferBuilderInner() {
         </div>
 
         {/* ── Main content ── */}
-        <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
+        <div className="w-full min-w-0" style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
             <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
               preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}
@@ -699,12 +699,12 @@ function OfferBuilderInner() {
               </button>
             </div>
             {/* Property context strip */}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 24px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)",fontSize:13,color:"var(--gray-700)",fontWeight:500}}>
+            <div className="flex flex-wrap items-center justify-between gap-2" style={{padding:"12px 24px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)",fontSize:13,color:"var(--gray-700)",fontWeight:500}}>
               <span>{property.address}, {property.city} {property.state}</span>
               <span>${property.price.toLocaleString()}</span>
             </div>
             {/* Plans */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,padding:24}}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{gap:16,padding:24}}>
               {/* Basic */}
               <div style={{border:"1.5px solid var(--gray-200)",borderRadius:12,padding:20}}>
                 <p style={{fontSize:13,fontWeight:600,color:"var(--gray-500)",marginBottom:8}}>BASIC</p>
@@ -982,9 +982,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
               `${d.state} Residential Purchase Agreement`
             ],
           ].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
-              <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
-              <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)",textAlign:"right",maxWidth:"60%"}}>{v}</span>
+            <div key={k} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1" style={{padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
+              <span style={{fontSize:13,color:"var(--gray-500)",flexShrink:0}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)",textAlign:"right",maxWidth:"65%"}}>{v}</span>
             </div>
           ))}
         </div>
@@ -1134,7 +1134,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       subtitle="This is a good-faith deposit that shows you're serious."
       helper="Earnest money is a deposit you make when your offer is accepted. It's held in an escrow account and applied to your down payment at closing. If you back out for reasons not covered by contingencies, you may lose this money. In Illinois, 2% of the purchase price is standard."
       showHelper={showHelper} toggleHelper={toggleHelper}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+      <div className="grid grid-cols-3" style={{gap:10,marginBottom:16}}>
         {[1,2,3].map(p=>(
           <button key={p} onClick={()=>set("earnestPct",p)}
             style={{padding:"14px",border:`1.5px solid ${d.earnestPct===p?"var(--blue)":"var(--gray-200)"}`,
@@ -1293,7 +1293,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
         onClick={()=>set("escalation",false)}/>
       {d.escalation===true && (
         <div className="card-sm" style={{padding:"16px 20px",marginTop:12,border:"1.5px solid #bfdbfe"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{gap:16}}>
             <div>
               <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Beat competing offers by</label>
               <div style={{position:"relative"}}>
@@ -1404,7 +1404,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           }}>
             <SignatureCanvas
               ref={sigCanvasRef}
-              canvasProps={{width:500,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
+              canvasProps={{width:320,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
               backgroundColor="#ffffff"
               penColor="#1e293b"
               onEnd={() => {
@@ -1543,9 +1543,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
                 <span style={{fontSize:11,fontWeight:700,color:"var(--gray-500)",textTransform:"uppercase",letterSpacing:"0.05em"}}>{r.section}</span>
               </div>
               {r.items.map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 20px",borderBottom:"1px solid var(--gray-100)"}}>
-                  <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
-                  <span style={{fontSize:13,fontWeight:600,color: String(v).includes("⚠️")?"var(--amber)":"var(--gray-900)"}}>{v}</span>
+                <div key={k} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1" style={{padding:"10px 20px",borderBottom:"1px solid var(--gray-100)"}}>
+                  <span style={{fontSize:13,color:"var(--gray-500)",flexShrink:0}}>{k}</span>
+                  <span style={{fontSize:13,fontWeight:600,color: String(v).includes("⚠️")?"var(--amber)":"var(--gray-900)",textAlign:"right"}}>{v}</span>
                 </div>
               ))}
             </div>

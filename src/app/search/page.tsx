@@ -232,7 +232,10 @@ function SearchContent() {
     if (beds !== "any" && p.beds < parseInt(beds, 10)) return false;
     if (!usingDbProperties && propType !== "any" && p.type !== propType) return false;
     const q = debouncedQuery.trim().toLowerCase();
-    if (q && !p.address.toLowerCase().includes(q) && !p.city?.toLowerCase().includes(q)) return false;
+    if (q) {
+      const cityState = `${p.city ?? ""}, ${p.state ?? ""}`.toLowerCase();
+      if (!p.address.toLowerCase().includes(q) && !cityState.includes(q)) return false;
+    }
     return true;
   });
 

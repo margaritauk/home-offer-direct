@@ -1,6 +1,7 @@
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Link from "next/link";
+import NoAgentBadge from "@/components/NoAgentBadge";
 import {
   CheckCircle,
   X,
@@ -149,6 +150,9 @@ export default function PricingPage() {
             Compare what you pay us to what you&apos;d pay a buyer&apos;s agent (2-3% of purchase price).
             On a $500K home, that&apos;s $15,000 vs. $99.
           </p>
+          <div className="flex justify-center mb-8 mt-6">
+            <NoAgentBadge size="lg" />
+          </div>
         </div>
       </section>
 

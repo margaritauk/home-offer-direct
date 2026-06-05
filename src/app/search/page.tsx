@@ -8,6 +8,7 @@ import { useAuth, useTierFeatures } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { ALL_PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
+import PreOfferLegalModal from "@/components/PreOfferLegalModal";
 import {
   Search, SlidersHorizontal, MapPin, Bed, Bath, Square,
   Heart, TrendingDown, TrendingUp, Sparkles, ChevronDown, Filter,
@@ -98,6 +99,18 @@ function SearchContent() {
   const [priceMax, setPriceMax] = useState("");
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
+  const [legalModalPropertyId, setLegalModalPropertyId] = useState<string | null>(null);
+
+  const handleMakeOffer = (propertyId: string) => {
+    try {
+      const key = `hod-legal-ack-${propertyId}`;
+      if (localStorage.getItem(key)) {
+        router.push(`/offer-builder?property=${propertyId}`);
+        return;
+      }
+    } catch {}
+    setLegalModalPropertyId(propertyId);
+  };
 
   // Save Search popover state
   const [showSavePopover, setShowSavePopover] = useState(false);
@@ -410,7 +423,7 @@ function SearchContent() {
               </div>
             ) : (
               filteredProperties.map(p => (
-                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
+                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} onMakeOffer={handleMakeOffer} />
               ))
             )}
           </div>
@@ -427,6 +440,12 @@ function SearchContent() {
           {newListingsCount} new listing{newListingsCount > 1 ? "s" : ""} — click to show
         </div>
       )}
+      {legalModalPropertyId && (
+        <PreOfferLegalModal
+          propertyId={legalModalPropertyId}
+          onClose={() => setLegalModalPropertyId(null)}
+        />
+      )}
       <Footer />
     </div>
   );
@@ -440,7 +459,7 @@ export default function SearchPage() {
   );
 }
 
-function PropertyCard({ property, saved, onToggleSave }: { property: Property; saved: boolean; onToggleSave: () => void }) {
+function PropertyCard({ property, saved, onToggleSave, onMakeOffer }: { property: Property; saved: boolean; onToggleSave: () => void; onMakeOffer: (id: string) => void }) {
   const showingMailto = `mailto:${property.agentEmail}?subject=Showing request — ${property.address}&body=Hi ${property.agentName.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${property.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`;
 
   return (
@@ -508,10 +527,11 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           </p>
         </div>
 
-        <Link href={`/offer-builder?property=${property.id}`}
+        <button
+          onClick={() => onMakeOffer(property.id)}
           className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all text-sm shadow-sm mb-3">
           Make an Offer <Sparkles className="w-4 h-4"/>
-        </Link>
+        </button>
 
         {/* Agent contact */}
         <div className="border-t border-slate-100 pt-3">

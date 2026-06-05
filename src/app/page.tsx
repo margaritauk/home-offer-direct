@@ -3,6 +3,7 @@ import Footer from "@/components/layout/Footer";
 import HowItWorks from "@/components/home/HowItWorks";
 import Link from "next/link";
 import { ArrowRight, CheckCircle, Search } from "lucide-react";
+import NoAgentBadge from "@/components/NoAgentBadge";
 
 export default function Home() {
   return (
@@ -60,6 +61,9 @@ export default function Home() {
                   <CheckCircle className="w-3.5 h-3.5 text-green-500" /> {t}
                 </span>
               ))}
+            </div>
+            <div className="flex justify-center mt-5">
+              <NoAgentBadge size="md" />
             </div>
           </div>
         </section>

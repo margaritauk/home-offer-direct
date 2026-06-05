@@ -443,8 +443,13 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group">
       <div className="relative h-52 bg-slate-100 overflow-hidden">
-        <div className="w-full h-full bg-cover bg-center group-hover:scale-105 transition-transform duration-500"
-          style={{backgroundImage:`url(${property.photos[0]})`}} />
+        {property.photos[0] && (
+          <img
+            src={property.photos[0]}
+            alt={property.address}
+            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
         <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${property.aiColor} backdrop-blur-sm`}>
           <Sparkles className="w-3 h-3" /> {property.aiScore} · {property.aiLabel}

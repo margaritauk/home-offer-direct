@@ -442,11 +442,13 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group">
-      <div className="relative h-52 bg-slate-100 overflow-hidden">
+      <div className="relative h-52 overflow-hidden"
+        style={{background: `linear-gradient(135deg, hsl(${property.id.charCodeAt(0) % 360},35%,82%), hsl(${(property.id.charCodeAt(0) + 80) % 360},35%,70%))`}}>
         {property.photos[0] && (
           <img
             src={property.photos[0]}
             alt={property.address}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         )}

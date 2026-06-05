@@ -43,7 +43,10 @@ function dbRowToProperty(row: DbPropertyRow): Property {
   const marketTrend: string = dom < 10 ? "hot" : dom > 30 ? "cooling" : "neutral";
   const agentName = row.agent_name ?? "";
   const agentEmail = row.agent_email ?? "";
-  const img = row.img ?? "";
+  const rawImg = row.img ?? "";
+  // Proxy picsum through same-origin to avoid iOS cross-domain redirect blocks
+  const picsumMatch = rawImg.match(/picsum\.photos\/id\/(\d+)/);
+  const img = picsumMatch ? `/api/property-image?id=${picsumMatch[1]}` : rawImg;
   return {
     id: row.id,
     address: row.address,

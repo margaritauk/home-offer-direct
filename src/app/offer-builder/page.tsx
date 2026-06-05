@@ -45,6 +45,10 @@ type D = {
   signatureDataUrl:string;
   signatureDate:string;
   signatureName:string;
+  // Sprint 1 additions
+  agentEmail:string;
+  deliveryMethod:"email"|"download";
+  attorneyReviewAck:boolean;
 };
 
 /* ─────────────────────────────────────────────────
@@ -139,6 +143,9 @@ const INITIAL_D: D = {
   signatureDataUrl:"",
   signatureDate:"",
   signatureName:"",
+  agentEmail:"",
+  deliveryMethod:"download",
+  attorneyReviewAck:false,
 };
 
 /* ─────────────────────────────────────────────────
@@ -162,6 +169,8 @@ function canContinue(step:number, d:D): boolean {
     case 13: return d.sellerCredits !== -1;
     case 14: return d.personalLetter !== null;
     case 15: return d.signatureDataUrl !== "" && d.signatureName.trim() !== "";
+    case 16: return d.state !== "IL" || d.attorneyReviewAck;
+    case 17: return d.deliveryMethod !== "email" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.agentEmail);
     default: return true;
   }
 }
@@ -242,6 +251,10 @@ function OfferBuilderInner() {
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle"|"saving"|"saved"|"error">("idle");
+  const saveStatusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Typed signature mode toggle
+  const [sigMode, setSigMode] = useState<"draw"|"type">("draw");
 
   // Signature canvas ref
   const sigCanvasRef = useRef<SignatureCanvas>(null);
@@ -277,10 +290,12 @@ function OfferBuilderInner() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Upsert draft offer to Supabase (debounced)
-  const upsertOfferToSupabase = (currentStep: number, currentD: D, offerId: string | null) => {
+  const upsertOfferToSupabase = (currentStep: number, currentD: D, offerId: string | null, immediate = false) => {
     if (!SUPABASE_ENABLED || !user) return;
 
     if (saveTimer.current) clearTimeout(saveTimer.current);
+    const delay = immediate ? 0 : 600;
+    setSaveStatus("saving");
     saveTimer.current = setTimeout(async () => {
       try {
         const supabase = await getSupabaseClient();
@@ -323,15 +338,20 @@ function OfferBuilderInner() {
           .single();
         if (error) {
           console.error("offer-builder: Supabase upsert failed", error);
+          setSaveStatus("error");
           return;
         }
         if (data?.id && !offerId) {
           supabaseOfferId.current = data.id as string;
         }
+        setSaveStatus("saved");
+        if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+        saveStatusTimer.current = setTimeout(() => setSaveStatus("idle"), 3000);
       } catch (err) {
         console.error("offer-builder: Supabase save error", err);
+        setSaveStatus("error");
       }
-    }, 600);
+    }, delay);
   };
 
   // Persist to localStorage whenever d or step changes
@@ -355,7 +375,28 @@ function OfferBuilderInner() {
   }, []);
 
   // Cleanup: cancel any pending debounced save on unmount
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (saveStatusTimer.current) clearTimeout(saveStatusTimer.current);
+  }, []);
+
+  // Auto-save every 60 seconds
+  useEffect(() => {
+    if (!SUPABASE_ENABLED || !user) return;
+    const interval = setInterval(() => {
+      upsertOfferToSupabase(step, d, supabaseOfferId.current);
+    }, 60000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, d, user]);
+
+  // Pre-populate agentEmail from property on mount
+  useEffect(() => {
+    if (d.agentEmail === "" && property.agentEmail) {
+      setD(prev => ({ ...prev, agentEmail: property.agentEmail }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clearProgress = () => {
     try { localStorage.removeItem(storageKey); } catch {}
@@ -513,7 +554,12 @@ function OfferBuilderInner() {
       upsertOfferToSupabase(nextStep, d, supabaseOfferId.current);
     }
   };
-  const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); setHint(false); };
+  const back = () => {
+    setStep(s=>Math.max(0,s-1));
+    setShowHelper(false);
+    setHint(false);
+    upsertOfferToSupabase(Math.max(0, step - 1), d, supabaseOfferId.current);
+  };
 
   const continueDisabled = !canContinue(step, d);
 
@@ -530,12 +576,23 @@ function OfferBuilderInner() {
         <ArrowLeft style={{width:15,height:15}}/> Back
       </button>
 
-      <div style={{textAlign:"center"}}>
+      <div style={{textAlign:"center",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
         <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
         {hint && (
-          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>
+          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500}}>
             {step === 15 ? "Please sign and enter your printed name to continue" : "Select an option to continue"}
           </p>
+        )}
+        {SUPABASE_ENABLED && user && (
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <button onClick={() => upsertOfferToSupabase(step, d, supabaseOfferId.current, true)}
+              style={{fontSize:10,fontWeight:600,padding:"3px 8px",borderRadius:5,background:"var(--gray-50)",border:"1px solid var(--gray-200)",color:"var(--gray-500)",cursor:"pointer"}}>
+              Save Draft
+            </button>
+            {saveStatus === "saving" && <span style={{fontSize:10,color:"var(--gray-400)"}}>Saving…</span>}
+            {saveStatus === "saved"  && <span style={{fontSize:10,color:"var(--green)",fontWeight:600}}>Saved ✓</span>}
+            {saveStatus === "error"  && <span style={{fontSize:10,color:"var(--red)"}}>Save failed</span>}
+          </div>
         )}
       </div>
 
@@ -641,7 +698,8 @@ function OfferBuilderInner() {
             <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
               preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}
               sigCanvasRef={sigCanvasRef as React.RefObject<SignatureCanvas>}
-              scoringResult={scoringResult}/>
+              scoringResult={scoringResult}
+              sigMode={sigMode} setSigMode={setSigMode}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -816,10 +874,12 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
 }
 
 function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
-  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef, scoringResult }:
+  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef, scoringResult,
+  sigMode, setSigMode }:
   { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void;
     preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void>;
-    sigCanvasRef: React.RefObject<SignatureCanvas>; scoringResult: ScoringResult }) {
+    sigCanvasRef: React.RefObject<SignatureCanvas>; scoringResult: ScoringResult;
+    sigMode:"draw"|"type"; setSigMode:(m:"draw"|"type")=>void }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -1009,6 +1069,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
         <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
           <span style={{fontSize:14}}>🤖</span>
           <span style={{fontSize:13,fontWeight:600,color:"var(--blue)"}}>AI Recommendation for Chicago · Lincoln Park</span>
+          <span style={{fontSize:10,fontWeight:700,padding:"2px 6px",borderRadius:4,background:"#dbeafe",color:"var(--blue)"}}>AI-generated</span>
         </div>
         <p style={{fontSize:13,color:"var(--gray-700)",lineHeight:1.6}}>
           Based on 14 recent sales, homes here sell for <strong>1–3% above asking</strong> in 9 days average. I recommend <strong>{fmt(Math.round(property.price*1.015))}</strong> — competitive without overbidding.
@@ -1392,9 +1453,27 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   if (step===15) {
     const hasSig = d.signatureDataUrl !== "";
     return (
-      <Q title="Sign your offer" subtitle="Draw your signature below to authorize this offer.">
+      <Q title="Sign your offer" subtitle="Draw or type your signature to authorize this offer.">
+        {/* Sig mode toggle */}
+        <div style={{display:"flex",gap:4,marginBottom:16,background:"var(--gray-100)",borderRadius:8,padding:4}}>
+          {(["draw","type"] as const).map(mode => (
+            <button key={mode} onClick={() => {
+              setSigMode(mode);
+              set("signatureDataUrl","");
+              set("signatureDate","");
+              sigCanvasRef.current?.clear();
+            }}
+              style={{flex:1,padding:"8px",borderRadius:6,border:"none",fontSize:13,fontWeight:600,cursor:"pointer",
+                background:sigMode===mode?"#fff":"transparent",
+                color:sigMode===mode?"var(--blue)":"var(--gray-500)",
+                boxShadow:sigMode===mode?"0 1px 3px rgba(0,0,0,0.1)":undefined}}>
+              {mode === "draw" ? "✏️ Draw signature" : "⌨️ Type your name"}
+            </button>
+          ))}
+        </div>
+
         {/* Canvas signature pad */}
-        <div style={{marginBottom:20}}>
+        <div style={{marginBottom:20,display:sigMode==="draw"?"block":"none"}}>
           <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:8}}>
             Sign here
           </label>
@@ -1404,7 +1483,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           }}>
             <SignatureCanvas
               ref={sigCanvasRef}
-              canvasProps={{width:320,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
+              canvasProps={{width:600,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
               backgroundColor="#ffffff"
               penColor="#1e293b"
               onEnd={() => {
@@ -1434,29 +1513,58 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           </div>
         </div>
 
-        {/* Printed name */}
-        <div style={{marginBottom:16}}>
-          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
-            Printed full name
-          </label>
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Your legal full name"
-            value={d.signatureName}
-            onChange={e=>set("signatureName",e.target.value)}
-          />
-        </div>
+        {/* Typed signature mode */}
+        {sigMode === "type" && (
+          <div style={{marginBottom:20}}>
+            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:8}}>
+              Type your full legal name
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Your legal full name"
+              value={d.signatureName}
+              style={{fontFamily:"cursive",fontSize:22,fontStyle:"italic",color:"#1e293b"}}
+              onChange={e => {
+                set("signatureName", e.target.value);
+                set("signatureDataUrl", e.target.value.trim() ? `typed:${e.target.value}` : "");
+              }}
+            />
+            {d.signatureName.trim() && (
+              <div style={{marginTop:10,padding:"12px 16px",border:"1px dashed var(--gray-300)",borderRadius:8,textAlign:"center"}}>
+                <p style={{fontFamily:"cursive",fontSize:26,color:"#1e293b",margin:0}}>{d.signatureName}</p>
+                <p style={{fontSize:11,color:"var(--gray-400)",marginTop:4}}>Typed signature preview</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Printed name (draw mode only — type mode uses the sig input as name) */}
+        {sigMode === "draw" && (
+          <div style={{marginBottom:16}}>
+            <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+              Printed full name
+            </label>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Your legal full name"
+              value={d.signatureName}
+              onChange={e=>set("signatureName",e.target.value)}
+            />
+          </div>
+        )}
 
         {/* Validation message */}
         {(!hasSig || d.signatureName.trim()==="") && (
           <div className="warn-box" style={{marginTop:8}}>
             <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>
-              {!hasSig && d.signatureName.trim()===""
-                ? "Please draw your signature and enter your printed name to continue."
-                : !hasSig
-                  ? "Please draw your signature to continue."
-                  : "Please enter your printed name to continue."}
+              {sigMode==="draw"
+                ? (!hasSig && d.signatureName.trim()===""
+                    ? "Please draw your signature and enter your printed name to continue."
+                    : !hasSig ? "Please draw your signature to continue."
+                    : "Please enter your printed name to continue.")
+                : "Please type your full legal name to continue."}
             </p>
           </div>
         )}
@@ -1551,6 +1659,65 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
             </div>
           ))}
         </div>
+        {/* Free tier disclaimer */}
+        <div style={{fontSize:11,color:"var(--gray-400)",textAlign:"center",padding:"8px",borderTop:"1px solid var(--gray-100)",marginBottom:16}}>
+          Standard Offer · Free Tier · Legal Validation Not Included
+        </div>
+
+        {/* Illinois mandatory clauses */}
+        {d.state === "IL" && (
+          <div className="card" style={{overflow:"hidden",marginBottom:16}}>
+            <div style={{padding:"10px 20px",background:"#f0fdf4",borderBottom:"1px solid var(--gray-200)"}}>
+              <span style={{fontSize:11,fontWeight:700,color:"#166534",textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                ✓ Legal Completeness — Illinois Mandatory Clauses
+              </span>
+            </div>
+            {[
+              {label:"Lead Paint Disclosure",text:"Buyer acknowledges receipt of EPA's lead paint pamphlet (homes built before 1978).",statute:"42 U.S.C. § 4852d"},
+              {label:"Radon Disclosure",text:"Seller discloses known radon hazards per Illinois Radon Awareness Act.",statute:"420 ILCS 46"},
+              {label:"Illinois Attorney Review Period",text:"Either party may cancel within 5 business days of acceptance by written notice of attorney disapproval.",statute:"Illinois CAR Standard"},
+              {label:"Fair Housing Acknowledgment",text:"This transaction complies with all applicable fair housing laws including the Illinois Human Rights Act.",statute:"775 ILCS 5"},
+            ].map(clause => (
+              <div key={clause.label} style={{padding:"12px 20px",borderBottom:"1px solid var(--gray-100)",display:"flex",gap:12,alignItems:"flex-start"}}>
+                <CheckCircle style={{width:14,height:14,color:"var(--green)",flexShrink:0,marginTop:2}}/>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2,flexWrap:"wrap"}}>
+                    <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)"}}>{clause.label}</span>
+                    <span style={{fontSize:10,fontWeight:500,padding:"1px 6px",borderRadius:4,background:"#dcfce7",color:"#166534"}}>Required by IL law</span>
+                    <TermTip tip={`${clause.text} — Statute: ${clause.statute}`}/>
+                  </div>
+                  <p style={{fontSize:12,color:"var(--gray-500)",lineHeight:1.5}}>{clause.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Illinois attorney review acknowledgment */}
+        {d.state === "IL" && !d.attorneyReviewAck && (
+          <div style={{border:"2px solid var(--amber)",borderRadius:12,padding:"16px 20px",marginBottom:16,background:"#fffbeb"}}>
+            <p style={{fontSize:14,fontWeight:700,color:"#92400e",marginBottom:8}}>⚖️ Illinois Attorney Review Period — Acknowledge Before Continuing</p>
+            <p style={{fontSize:13,color:"#78350f",lineHeight:1.6,marginBottom:12}}>
+              In Illinois, your <strong>5-day attorney review period starts when the seller accepts your offer</strong> — not when you receive notice.
+              Example: Accepted Monday 9am → deadline is Saturday 9am.{" "}
+              <a href="https://ilga.gov/legislation/ilcs/ilcs3.asp?ActID=2221" target="_blank" rel="noopener noreferrer" style={{color:"var(--blue)"}}>765 ILCS 77 →</a>
+            </p>
+            <label style={{display:"flex",alignItems:"flex-start",gap:10,cursor:"pointer"}}>
+              <input type="checkbox" checked={d.attorneyReviewAck}
+                onChange={e=>set("attorneyReviewAck",e.target.checked as unknown as boolean)}
+                style={{width:16,height:16,marginTop:2,flexShrink:0,cursor:"pointer"}}/>
+              <span style={{fontSize:13,color:"#78350f",lineHeight:1.5}}>
+                I understand the Illinois attorney review period begins at acceptance and I have 5 business days to hire an attorney to review or modify the contract.
+              </span>
+            </label>
+          </div>
+        )}
+        {d.state === "IL" && d.attorneyReviewAck && (
+          <div className="good-box" style={{marginBottom:16}}>
+            <p style={{fontSize:13,color:"#065f46"}}>✓ Attorney review period acknowledged.</p>
+          </div>
+        )}
+
         <div className="good-box">
           <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>Your offer package is ready to generate. You&apos;ll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
         </div>
@@ -1558,28 +1725,66 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     );
   }
 
-  // ── Step 17: Submit ─────────────────────────────────────────────────
+  // ── Step 17: Delivery choice (free tier) ───────────────────────────
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.agentEmail);
   return (
-    <Q title="Get your offer package" subtitle="Choose how you'd like to receive and deliver your offer.">
-      {[
-        {icon:"📄", title:"Download PDF package", desc:"Professional PDF with purchase agreement, addendums, and cover letter. You deliver it.", badge:"$29", href:"/pricing"},
-        {icon:"✉️", title:"Send directly to listing agent", desc:`Email to ${property.agent} at ${property.brokerage} with read receipt tracking.`, badge:"$99 Premium", href:"/pricing", featured:true},
-      ].map(o=>(
-        <Link key={o.title} href={o.href}
-          style={{display:"flex",alignItems:"flex-start",gap:16,padding:"20px",border:`1.5px solid ${o.featured?"var(--blue)":"var(--gray-200)"}`,
-            borderRadius:12,background:o.featured?"var(--blue-light)":"#fff",textDecoration:"none",marginBottom:10,transition:"all .15s"}}>
-          <span style={{fontSize:28,flexShrink:0}}>{o.icon}</span>
-          <div style={{flex:1}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-              <span style={{fontSize:15,fontWeight:600,color:"var(--gray-900)"}}>{o.title}</span>
-              <span style={{fontSize:11,fontWeight:700,padding:"2px 8px",borderRadius:99,background:o.featured?"var(--blue)":"var(--gray-200)",color:o.featured?"#fff":"var(--gray-600)"}}>{o.badge}</span>
-            </div>
-            <p style={{fontSize:13,color:"var(--gray-500)",lineHeight:1.5}}>{o.desc}</p>
+    <Q title="How would you like to deliver your offer?" subtitle="Your complete offer package is ready — choose a delivery method.">
+      {/* Option A: Email to agent */}
+      <button onClick={() => set("deliveryMethod", "email")}
+        className={`option-card ${d.deliveryMethod==="email"?"selected":""}`}
+        style={{marginBottom:10,width:"100%",textAlign:"left"}}>
+        <span style={{fontSize:24,flexShrink:0}}>✉️</span>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--gray-900)"}}>Email to listing agent</span>
+            <span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:99,background:"#dbeafe",color:"var(--blue)"}}>Recommended</span>
           </div>
-          <ArrowRight style={{width:16,height:16,color:"var(--gray-300)",flexShrink:0,marginTop:2}}/>
-        </Link>
-      ))}
-      <div className="warn-box" style={{marginTop:8}}>
+          <p style={{fontSize:13,color:"var(--gray-500)",lineHeight:1.5}}>Send directly to {property.agent} at {property.brokerage}.</p>
+        </div>
+        <div className="check">{d.deliveryMethod==="email"&&<CheckCircle style={{width:13,height:13,color:"#fff"}}/>}</div>
+      </button>
+
+      {/* Email input (shown when email mode selected) */}
+      {d.deliveryMethod === "email" && (
+        <div style={{marginBottom:16,padding:"14px 16px",border:"1.5px solid #bfdbfe",borderRadius:10,background:"var(--blue-light)"}}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+            Listing agent&apos;s email address <span style={{color:"var(--red)"}}>*</span>
+          </label>
+          <input type="email" className="input-field" value={d.agentEmail}
+            placeholder="listing.agent@brokerage.com"
+            onChange={e => set("agentEmail", e.target.value)}/>
+          {d.agentEmail && !emailValid && (
+            <p style={{fontSize:12,color:"var(--red)",marginTop:4}}>Please enter a valid email address</p>
+          )}
+          {d.agentEmail && emailValid && (
+            <p style={{fontSize:12,color:"var(--green)",marginTop:4}}>✓ Confirm this is correct before sending</p>
+          )}
+          <button onClick={() => { set("deliveryMethod","download"); set("agentEmail",""); }}
+            style={{fontSize:12,color:"var(--gray-500)",background:"none",border:"none",cursor:"pointer",marginTop:8,padding:0,textDecoration:"underline"}}>
+            I don&apos;t have the listing agent&apos;s email → Download PDF instead
+          </button>
+          <p style={{fontSize:11,color:"var(--gray-400)",marginTop:8}}>
+            ✨ <Link href="/pricing" style={{color:"var(--blue)"}}>Upgrade to Premium ($99)</Link> for read receipt tracking + AI negotiation copilot
+          </p>
+        </div>
+      )}
+
+      {/* Option B: Download PDF */}
+      <button onClick={() => set("deliveryMethod", "download")}
+        className={`option-card ${d.deliveryMethod==="download"?"selected":""}`}
+        style={{marginBottom:16,width:"100%",textAlign:"left"}}>
+        <span style={{fontSize:24,flexShrink:0}}>📄</span>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
+            <span style={{fontSize:15,fontWeight:600,color:"var(--gray-900)"}}>Download PDF only</span>
+            <span style={{fontSize:11,fontWeight:600,padding:"2px 8px",borderRadius:99,background:"#dcfce7",color:"#166534"}}>Free</span>
+          </div>
+          <p style={{fontSize:13,color:"var(--gray-500)",lineHeight:1.5}}>Full offer package PDF — you deliver it yourself.</p>
+        </div>
+        <div className="check">{d.deliveryMethod==="download"&&<CheckCircle style={{width:13,height:13,color:"#fff"}}/>}</div>
+      </button>
+
+      <div className="warn-box">
         <p style={{fontSize:12,color:"#92400e",lineHeight:1.5}}>⚖️ HomeOfferDirect is not a law firm. We strongly recommend having a licensed Illinois real estate attorney review your offer before submitting.</p>
       </div>
     </Q>

@@ -8,11 +8,44 @@ import { useAuth, useTierFeatures } from "@/lib/auth-context";
 import { formatCurrency } from "@/lib/utils";
 import { ALL_PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
+import PreOfferLegalModal from "@/components/PreOfferLegalModal";
 import {
   Search, SlidersHorizontal, MapPin, Bed, Bath, Square,
   Heart, TrendingDown, TrendingUp, Sparkles, ChevronDown, Filter,
-  Phone, Mail, Bookmark,
+  Phone, Mail, Bookmark, X,
 } from "lucide-react";
+
+/* ─── Filter persistence helpers (#327) ───────────────────────────────── */
+const FILTER_DEFAULTS = {
+  query: "Chicago, IL",
+  priceMin: "",
+  priceMax: "",
+  beds: "any",
+  propType: "any",
+};
+
+function getFilterStorageKey(userId?: string) {
+  return userId ? `hod-search-filters-${userId}` : "hod-search-filters";
+}
+
+function loadFiltersFromStorage(userId?: string) {
+  if (typeof window === "undefined") return null;
+  if (userId) {
+    // Prefer user-keyed storage; fall back to guest key
+    const userRaw = localStorage.getItem(getFilterStorageKey(userId));
+    if (userRaw) {
+      try { return JSON.parse(userRaw); } catch { /* ignore */ }
+    }
+    const guestRaw = localStorage.getItem(getFilterStorageKey());
+    if (guestRaw) {
+      try { return JSON.parse(guestRaw); } catch { /* ignore */ }
+    }
+    return null;
+  }
+  const raw = localStorage.getItem(getFilterStorageKey());
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
 
 /* ── Supabase DB row shape (only columns that exist in the schema) ──── */
 interface DbPropertyRow {
@@ -92,12 +125,27 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const { user, saveHome, unsaveHome } = useAuth();
   const features = useTierFeatures();
-  const [query, setQuery] = useState("Chicago, IL");
+  const [query, setQuery] = useState(FILTER_DEFAULTS.query);
   const [debouncedQuery, setDebouncedQuery] = useState(query);
-  const [priceMin, setPriceMin] = useState("");
-  const [priceMax, setPriceMax] = useState("");
-  const [beds, setBeds] = useState("any");
-  const [propType, setPropType] = useState("any");
+  const [priceMin, setPriceMin] = useState(FILTER_DEFAULTS.priceMin);
+  const [priceMax, setPriceMax] = useState(FILTER_DEFAULTS.priceMax);
+  const [beds, setBeds] = useState(FILTER_DEFAULTS.beds);
+  const [propType, setPropType] = useState(FILTER_DEFAULTS.propType);
+  const [legalModalPropertyId, setLegalModalPropertyId] = useState<string | null>(null);
+
+  // Track whether we've loaded filters from storage (avoid overwriting on mount)
+  const filtersLoaded = useRef(false);
+
+  const handleMakeOffer = (propertyId: string) => {
+    try {
+      const key = `hod-legal-ack-${propertyId}`;
+      if (localStorage.getItem(key)) {
+        router.push(`/offer-builder?property=${propertyId}`);
+        return;
+      }
+    } catch {}
+    setLegalModalPropertyId(propertyId);
+  };
 
   // Save Search popover state
   const [showSavePopover, setShowSavePopover] = useState(false);
@@ -114,6 +162,59 @@ function SearchContent() {
   // Realtime new-listings state
   const [newListingsCount, setNewListingsCount] = useState(0);
   const pendingNewProps = useRef<Property[]>([]);
+
+  // Restore filters from localStorage on mount (#327)
+  useEffect(() => {
+    if (filtersLoaded.current) return;
+    filtersLoaded.current = true;
+    const saved = loadFiltersFromStorage(user?.id);
+    if (!saved) return;
+    if (saved.query !== undefined) setQuery(saved.query);
+    if (saved.priceMin !== undefined) setPriceMin(saved.priceMin);
+    if (saved.priceMax !== undefined) setPriceMax(saved.priceMax);
+    if (saved.beds !== undefined) setBeds(saved.beds);
+    if (saved.propType !== undefined) setPropType(saved.propType);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When auth state changes, reload filters using the correct key (#327)
+  useEffect(() => {
+    if (!filtersLoaded.current) return;
+    const saved = loadFiltersFromStorage(user?.id);
+    if (!saved) return;
+    if (saved.query !== undefined) setQuery(saved.query);
+    if (saved.priceMin !== undefined) setPriceMin(saved.priceMin);
+    if (saved.priceMax !== undefined) setPriceMax(saved.priceMax);
+    if (saved.beds !== undefined) setBeds(saved.beds);
+    if (saved.propType !== undefined) setPropType(saved.propType);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Persist filters to localStorage on every change (#327)
+  useEffect(() => {
+    if (!filtersLoaded.current) return;
+    if (typeof window === "undefined") return;
+    const key = getFilterStorageKey(user?.id);
+    localStorage.setItem(key, JSON.stringify({ query, priceMin, priceMax, beds, propType }));
+  }, [query, priceMin, priceMax, beds, propType, user?.id]);
+
+  const isFilterActive =
+    query !== FILTER_DEFAULTS.query ||
+    priceMin !== FILTER_DEFAULTS.priceMin ||
+    priceMax !== FILTER_DEFAULTS.priceMax ||
+    beds !== FILTER_DEFAULTS.beds ||
+    propType !== FILTER_DEFAULTS.propType;
+
+  const clearAllFilters = () => {
+    setQuery(FILTER_DEFAULTS.query);
+    setPriceMin(FILTER_DEFAULTS.priceMin);
+    setPriceMax(FILTER_DEFAULTS.priceMax);
+    setBeds(FILTER_DEFAULTS.beds);
+    setPropType(FILTER_DEFAULTS.propType);
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(getFilterStorageKey(user?.id));
+    }
+  };
 
   useEffect(() => {
     if (!SUPABASE_ENABLED) return;
@@ -260,7 +361,7 @@ function SearchContent() {
       <div className="bg-white border-b border-slate-200 pt-20 pb-4 sticky top-0 z-40 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input type="text" value={query} onChange={e => setQuery(e.target.value)}
                 placeholder="City, ZIP, or address..."
@@ -287,6 +388,15 @@ function SearchContent() {
             <button className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white min-h-[44px]">
               <SlidersHorizontal className="w-4 h-4" /> Filters
             </button>
+            {isFilterActive && (
+              <button
+                onClick={clearAllFilters}
+                className="flex items-center justify-center gap-1.5 px-4 py-3 border border-slate-300 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-all bg-white min-h-[44px]"
+                aria-label="Clear all filters"
+              >
+                <X className="w-3.5 h-3.5" /> Clear all
+              </button>
+            )}
             <div className="relative" ref={popoverRef}>
               <button
                 onClick={handleOpenSavePopover}
@@ -403,14 +513,14 @@ function SearchContent() {
             {filteredProperties.length === 0 ? (
               <div className="col-span-full py-20 text-center">
                 <p className="text-slate-500 font-medium">No homes match your filters</p>
-                <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
+                <button onClick={clearAllFilters}
                   className="mt-3 text-sm text-blue-600 hover:underline">
                   Clear filters
                 </button>
               </div>
             ) : (
               filteredProperties.map(p => (
-                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
+                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} onMakeOffer={handleMakeOffer} />
               ))
             )}
           </div>
@@ -427,6 +537,12 @@ function SearchContent() {
           {newListingsCount} new listing{newListingsCount > 1 ? "s" : ""} — click to show
         </div>
       )}
+      {legalModalPropertyId && (
+        <PreOfferLegalModal
+          propertyId={legalModalPropertyId}
+          onClose={() => setLegalModalPropertyId(null)}
+        />
+      )}
       <Footer />
     </div>
   );
@@ -440,7 +556,7 @@ export default function SearchPage() {
   );
 }
 
-function PropertyCard({ property, saved, onToggleSave }: { property: Property; saved: boolean; onToggleSave: () => void }) {
+function PropertyCard({ property, saved, onToggleSave, onMakeOffer }: { property: Property; saved: boolean; onToggleSave: () => void; onMakeOffer: (id: string) => void }) {
   const showingMailto = `mailto:${property.agentEmail}?subject=Showing request — ${property.address}&body=Hi ${property.agentName.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${property.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`;
 
   return (
@@ -451,6 +567,7 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           <img
             src={property.photos[0]}
             alt={property.address}
+            loading="lazy"
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
             className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
@@ -473,9 +590,9 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
         )}
       </div>
 
-      <div className="p-5">
-        <div className="flex items-start justify-between mb-2">
-          <div>
+      <div className="p-5 min-w-0 overflow-hidden">
+        <div className="flex items-start justify-between mb-2 min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-2xl font-black text-slate-900">{formatCurrency(property.price)}</p>
             {property.priceChange !== 0 && (
               <div className={`flex items-center gap-1 text-xs font-medium ${property.priceChange<0 ? "text-green-600" : "text-red-500"}`}>
@@ -484,10 +601,10 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
               </div>
             )}
           </div>
-          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg">{property.type}</span>
+          <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-lg flex-shrink-0 ml-2">{property.type}</span>
         </div>
 
-        <div className="flex items-center gap-1 mb-3">
+        <div className="flex items-center gap-1 mb-3 min-w-0">
           <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
           <p className="text-sm text-slate-600 truncate">{property.address}, {property.city}, {property.state}</p>
         </div>
@@ -508,14 +625,15 @@ function PropertyCard({ property, saved, onToggleSave }: { property: Property; s
           </p>
         </div>
 
-        <Link href={`/offer-builder?property=${property.id}`}
+        <button
+          onClick={() => onMakeOffer(property.id)}
           className="flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all text-sm shadow-sm mb-3">
           Make an Offer <Sparkles className="w-4 h-4"/>
-        </Link>
+        </button>
 
         {/* Agent contact */}
         <div className="border-t border-slate-100 pt-3">
-          <p className="text-xs text-slate-400 mb-2">
+          <p className="text-xs text-slate-400 mb-2 truncate">
             Listing agent: <span className="text-slate-600 font-medium">{property.agentName}</span>
             <span className="text-slate-300 mx-1">·</span>
             <span>{property.brokerage}</span>

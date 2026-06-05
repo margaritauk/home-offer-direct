@@ -20,9 +20,9 @@ CREATE OR REPLACE FUNCTION resolve_offer_property_address()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.property_id IS NOT NULL THEN
-    SELECT p.address INTO NEW.property_address
-      FROM public.properties p
-     WHERE p.id = NEW.property_id;
+    SELECT address INTO NEW.property_address
+      FROM public.properties
+     WHERE id = NEW.property_id;
   ELSE
     NEW.property_address := NEW.address;
   END IF;
@@ -39,8 +39,8 @@ CREATE TRIGGER offers_resolve_property_address
   EXECUTE FUNCTION resolve_offer_property_address();
 
 -- Back-fill property_address for any existing rows
-UPDATE public.offers o
+UPDATE public.offers AS o
 SET property_address = COALESCE(
-      (SELECT p.address FROM public.properties p WHERE p.id = o.property_id),
+      (SELECT address FROM public.properties WHERE id = o.property_id),
       o.address
     );

@@ -1,0 +1,131 @@
+export const runtime = "nodejs";
+
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createElement } from "react";
+import { OfferSummaryPdf } from "@/components/pdf/OfferSummaryPdf";
+import type { OfferRow, PropertyRow } from "@/components/pdf/OfferSummaryPdf";
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  /* ── Auth ── */
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: () => {},
+      },
+    }
+  );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /* ── Fetch offer (RLS ensures user can only see their own rows) ── */
+  const { data: offerData, error: offerError } = await supabase
+    .from("offers")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (offerError || !offerData) {
+    return new Response(JSON.stringify({ error: "Offer not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const offer = offerData as OfferRow;
+
+  /* ── Fetch user's verification status ── */
+  const { data: userProfile } = await supabase
+    .from("users")
+    .select("id_verified_at")
+    .eq("id", user.id)
+    .single();
+
+  const isVerified = !!(userProfile?.id_verified_at);
+
+  /* ── Fetch property row (for beds/baths/sqft) if property_id is set ── */
+  let property: PropertyRow | null = null;
+  if (offer.property_id) {
+    const { data: propData } = await supabase
+      .from("properties")
+      .select("id, address, city, state, zip, price, beds, baths, sqft, dom, agent_name, agent_email, brokerage")
+      .eq("id", offer.property_id)
+      .single();
+    if (propData) {
+      property = propData as PropertyRow;
+    }
+  }
+
+  /* ── Render PDF ── */
+  // Cast needed: createElement returns FunctionComponentElement but renderToBuffer
+  // expects ReactElement<DocumentProps>. The runtime shape is compatible.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+  const { renderToBuffer } = require("@react-pdf/renderer") as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const element = createElement(OfferSummaryPdf, { offer, property, isVerified }) as any;
+  let pdfBuffer: Buffer;
+  try {
+    pdfBuffer = await renderToBuffer(element);
+  } catch (err) {
+    console.error('PDF render error', err);
+    return NextResponse.json({ error: 'Failed to generate PDF. Please contact support.' }, { status: 500 });
+  }
+
+  /* ── Upload to Supabase Storage (service role to bypass storage RLS) ── */
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const storagePath = `offer-pdfs/${user.id}/${id}.pdf`;
+  const { error: uploadError } = await serviceClient.storage
+    .from("documents")
+    .upload(storagePath, pdfBuffer, {
+      contentType: "application/pdf",
+      upsert: true,
+    });
+
+  if (!uploadError) {
+    /* ── Persist pdf_url back to the offers row ── */
+    const { data: urlData } = serviceClient.storage
+      .from("documents")
+      .getPublicUrl(storagePath);
+
+    if (urlData?.publicUrl) {
+      await serviceClient
+        .from("offers")
+        .update({ pdf_url: urlData.publicUrl })
+        .eq("id", id);
+    }
+  }
+  // Non-fatal: return PDF even if storage upload fails
+
+  /* ── Stream PDF to client ── */
+  return new Response(pdfBuffer as unknown as BodyInit, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="offer-summary.pdf"`,
+      "Content-Length": String(pdfBuffer.length),
+    },
+  });
+}

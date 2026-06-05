@@ -1,11 +1,16 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle, ChevronDown, ChevronUp, AlertTriangle, Info, Home, RotateCcw, X } from "lucide-react";
+import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
+import SignatureCanvas from "react-signature-canvas";
 import { track } from "@/lib/analytics";
 import { ALL_PROPERTIES as PROPERTIES } from "@/lib/properties";
 import type { Property } from "@/lib/properties";
+import { useAuth } from "@/lib/auth-context";
+import { scoreOffer } from "@/lib/scoring";
+import type { ScoringResult } from "@/lib/scoring";
 
 /* ─────────────────────────────────────────────────
    WORKFLOW DEFINITION
@@ -19,9 +24,10 @@ const SECTIONS = [
   { id:"timeline", label:"Timeline",       steps:[8,9] },
   { id:"protect",  label:"Contingencies",  steps:[10,11,12] },
   { id:"terms",    label:"Extra Terms",    steps:[13,14] },
-  { id:"review",   label:"Review & Send",  steps:[15,16] },
+  { id:"sign",     label:"Sign",           steps:[15] },
+  { id:"review",   label:"Review & Send",  steps:[16,17] },
 ];
-const TOTAL = 17;
+const TOTAL = 18;
 
 type D = {
   buyerType:string; state:string; firstTime:boolean;
@@ -36,6 +42,9 @@ type D = {
   sellerCredits:number;
   personalLetter:boolean|null;
   personalLetterText:string;
+  signatureDataUrl:string;
+  signatureDate:string;
+  signatureName:string;
 };
 
 /* ─────────────────────────────────────────────────
@@ -43,6 +52,76 @@ type D = {
 ───────────────────────────────────────────────── */
 
 const fmt = (n:number) => "$"+n.toLocaleString();
+
+/* ─────────────────────────────────────────────────
+   TERM TIP — plain-English inline explainer
+   Usage: <TermTip tip="Your plain-English explanation here." />
+   Renders an ℹ icon that opens a popover on click/hover.
+───────────────────────────────────────────────── */
+function TermTip({ tip }: { tip: string }) {
+  return (
+    <Popover style={{ display: "inline-block", position: "relative", verticalAlign: "middle" }}>
+      <PopoverButton
+        aria-label="What does this mean?"
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 18, height: 18, borderRadius: "50%",
+          background: "var(--blue-light)", border: "1.5px solid #bfdbfe",
+          color: "var(--blue)", cursor: "pointer", padding: 0,
+          marginLeft: 6, flexShrink: 0, lineHeight: 1,
+        }}>
+        <Info style={{ width: 10, height: 10 }} />
+      </PopoverButton>
+      <PopoverPanel
+        style={{
+          position: "absolute", zIndex: 100, bottom: "calc(100% + 8px)", left: "50%",
+          transform: "translateX(-50%)", width: 260,
+          background: "#1e293b", color: "#f1f5f9",
+          borderRadius: 10, padding: "10px 14px",
+          fontSize: 12, lineHeight: 1.6, fontWeight: 400,
+          boxShadow: "0 8px 24px -4px rgba(0,0,0,0.35)",
+          pointerEvents: "none",
+        }}>
+        {tip}
+        {/* Arrow */}
+        <span style={{
+          position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+          width: 0, height: 0,
+          borderLeft: "6px solid transparent", borderRight: "6px solid transparent",
+          borderTop: "6px solid #1e293b",
+        }} />
+      </PopoverPanel>
+    </Popover>
+  );
+}
+
+/* Plain-English tip text for each term */
+const TIPS = {
+  inspectionContingency:
+    "This lets you back out of the deal — and get your deposit back — if a professional home inspector finds serious problems like a bad roof, foundation cracks, or faulty wiring.",
+  financingContingency:
+    "Even with a pre-approval, loans can fall through. This clause lets you walk away and keep your deposit if your mortgage is denied before closing.",
+  appraisalContingency:
+    "Your lender will hire an appraiser to confirm the home's value. If the appraisal comes in lower than your offer, this clause lets you renegotiate the price or back out without losing your deposit.",
+  earnestMoney:
+    "This is a good-faith deposit — usually 1–3% of the purchase price — that you pay when your offer is accepted. It shows the seller you're serious. It gets applied to your down payment at closing, but you could lose it if you back out for a reason not covered by your contingencies.",
+  closingDate:
+    "The closing date is the day you officially become the owner and get the keys. It's typically 30–45 days after your offer is accepted, giving time for inspections, appraisal, and your lender to finalize the loan.",
+  escalationClause:
+    "This tells the seller: 'I'll automatically beat any competing offer by $X, up to a maximum I set.' It keeps you competitive without revealing your top dollar upfront. It only kicks in if there's a real competing offer.",
+  escalationCap:
+    "This is the most you're willing to pay — your absolute ceiling. The escalation clause won't push your price above this number no matter how many competing offers there are.",
+  asIs:
+    "Buying 'as-is' means you accept the home in its current condition. The seller won't make repairs. It's riskier, but can appeal to sellers who don't want the hassle of fixing things before closing.",
+  preApproval:
+    "A pre-approval means a lender has reviewed your income, credit, and assets and agreed to loan you up to a set amount. It's much stronger than a pre-qualification, which is just a rough estimate. Sellers take pre-approvals seriously.",
+  preQualification:
+    "A pre-qualification is a quick, informal estimate of how much you might be able to borrow — usually just based on self-reported income. It carries less weight than a full pre-approval because the lender hasn't verified anything yet.",
+  sellerCredits:
+    "Seller credits (also called seller concessions) are when the seller agrees to pay some of your closing costs at settlement. This can save you thousands upfront, but asking for credits may weaken your offer in a competitive market.",
+  downPayment:
+    "Your down payment is the portion of the purchase price you pay upfront in cash. The bank covers the rest with a mortgage. Putting down 20% or more avoids Private Mortgage Insurance (PMI), which adds $100–300/month to your payment.",
+};
 
 const INITIAL_D: D = {
   buyerType:"", state:"", firstTime:false,
@@ -57,6 +136,9 @@ const INITIAL_D: D = {
   sellerCredits:-1,
   personalLetter:null,
   personalLetterText:"",
+  signatureDataUrl:"",
+  signatureDate:"",
+  signatureName:"",
 };
 
 /* ─────────────────────────────────────────────────
@@ -79,6 +161,7 @@ function canContinue(step:number, d:D): boolean {
     case 12: return d.escalation !== null;
     case 13: return d.sellerCredits !== -1;
     case 14: return d.personalLetter !== null;
+    case 15: return d.signatureDataUrl !== "" && d.signatureName.trim() !== "";
     default: return true;
   }
 }
@@ -98,11 +181,30 @@ function LoadingSpinner() {
 }
 
 /* ─────────────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────────────── */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
+const SUPABASE_ENABLED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+async function getSupabaseClient() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
+
+/* ─────────────────────────────────────────────────
    INNER COMPONENT (uses useSearchParams)
 ───────────────────────────────────────────────── */
 function OfferBuilderInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const propertyId = searchParams.get("property") ?? "1";
   const exitDest = searchParams.get("from") ?? "/search";
   const property = PROPERTIES.find(p => p.id === propertyId) ?? PROPERTIES[0];
@@ -138,6 +240,99 @@ function OfferBuilderInner() {
   const [dateValue, setDateValue] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
   const [showPricingModal, setShowPricingModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Signature canvas ref
+  const sigCanvasRef = useRef<SignatureCanvas>(null);
+
+  // Pre-approval upload state
+  const [preApprovalPath, setPreApprovalPath] = useState<string | null>(null);
+  const [preApprovalUploadError, setPreApprovalUploadError] = useState<string | null>(null);
+  const [preApprovalUploading, setPreApprovalUploading] = useState(false);
+  const [preApprovalLocalFile, setPreApprovalLocalFile] = useState<File | null>(null);
+
+  // ── Scoring: recompute whenever d or property changes ──────────────
+  const scoringResult: ScoringResult = useMemo(() => {
+    return scoreOffer({
+      offerPrice: d.offerPrice > 0 ? d.offerPrice : property.price,
+      listPrice: property.price,
+      inspectionContingency: d.inspectionContingency ?? true,
+      financingContingency: d.financeType === "cash" ? false : (d.financingContingency ?? true),
+      appraisalContingency: d.financeType === "cash" ? false : (d.appraisalContingency ?? true),
+      cashOffer: d.financeType === "cash",
+      closingDays: d.closingDays > 0 ? d.closingDays : 45,
+      escalation: d.escalation ?? false,
+      escalationIncrement: d.escIncrement,
+      escalationCap: d.escMax,
+      emdPercent: d.earnestPct,
+      sellerCredits: d.sellerCredits,
+      preApprovalUploaded: !!(preApprovalPath || preApprovalLocalFile),
+    });
+  }, [d, property.price, preApprovalPath, preApprovalLocalFile]);
+
+  // Supabase offer row ID — once created, subsequent saves use upsert with this id
+  const supabaseOfferId = useRef<string | null>(null);
+  // Debounce timer ref for Supabase upserts
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Upsert draft offer to Supabase (debounced)
+  const upsertOfferToSupabase = (currentStep: number, currentD: D, offerId: string | null) => {
+    if (!SUPABASE_ENABLED || !user) return;
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const supabase = await getSupabaseClient();
+        const currentScore = scoreOffer({
+          offerPrice: currentD.offerPrice > 0 ? currentD.offerPrice : property.price,
+          listPrice: property.price,
+          inspectionContingency: currentD.inspectionContingency ?? true,
+          financingContingency: currentD.financeType === "cash" ? false : (currentD.financingContingency ?? true),
+          appraisalContingency: currentD.financeType === "cash" ? false : (currentD.appraisalContingency ?? true),
+          cashOffer: currentD.financeType === "cash",
+          closingDays: currentD.closingDays > 0 ? currentD.closingDays : 45,
+          escalation: currentD.escalation ?? false,
+          escalationIncrement: currentD.escIncrement,
+          escalationCap: currentD.escMax,
+          emdPercent: currentD.earnestPct,
+          sellerCredits: currentD.sellerCredits,
+          preApprovalUploaded: !!(preApprovalPath),
+        });
+        const payload: Record<string, unknown> = {
+          user_id: user.id,
+          address: `${property.address}, ${property.city}, ${property.state} ${property.zip}`,
+          list_price: property.price,
+          status: "draft" as const,
+          tier: currentScore.tier,
+          ai_score: currentScore.score,
+          offer_price: currentD.offerPrice > 0 ? currentD.offerPrice : null,
+          terms: { step: currentStep, ...currentD, preApprovalPath } as Record<string, unknown>,
+        };
+        // Only set property_id FK when the id is a real UUID (DB row)
+        if (isValidUUID(propertyId)) {
+          payload.property_id = propertyId;
+        }
+        if (offerId) {
+          payload.id = offerId;
+        }
+        const { data, error } = await supabase
+          .from("offers")
+          .upsert(payload, { onConflict: "id" })
+          .select("id")
+          .single();
+        if (error) {
+          console.error("offer-builder: Supabase upsert failed", error);
+          return;
+        }
+        if (data?.id && !offerId) {
+          supabaseOfferId.current = data.id as string;
+        }
+      } catch (err) {
+        console.error("offer-builder: Supabase save error", err);
+      }
+    }, 600);
+  };
 
   // Persist to localStorage whenever d or step changes
   useEffect(() => {
@@ -146,17 +341,133 @@ function OfferBuilderInner() {
     } catch {}
   }, [d, step, storageKey]);
 
+  // On mount (step >= 1 or when user advances to step 2+): create initial draft
+  useEffect(() => {
+    if (step >= 1) {
+      upsertOfferToSupabase(step, d, supabaseOfferId.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     track({ event: "offer_builder_started", property_id: property.id });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cleanup: cancel any pending debounced save on unmount
+  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+
   const clearProgress = () => {
     try { localStorage.removeItem(storageKey); } catch {}
     setD(INITIAL_D);
     setStep(0);
+    supabaseOfferId.current = null;
     setShowHelper(false);
     setHint(false);
+    setPreApprovalPath(null);
+    setPreApprovalUploadError(null);
+    setPreApprovalLocalFile(null);
+  };
+
+  const handlePreApprovalUpload = async (file: File) => {
+    // Validate type
+    if (file.type !== "application/pdf") {
+      setPreApprovalUploadError("Only PDF files are accepted.");
+      return;
+    }
+    // Validate size (10 MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setPreApprovalUploadError("File must be 10 MB or smaller.");
+      return;
+    }
+    setPreApprovalUploadError(null);
+    setPreApprovalLocalFile(file);
+
+    if (!SUPABASE_ENABLED) {
+      // Store locally only — no upload
+      return;
+    }
+
+    setPreApprovalUploading(true);
+    try {
+      const supabase = await getSupabaseClient();
+      const userId = user?.id ?? "anon";
+      const offerId = supabaseOfferId.current;
+      const prefix = offerId ?? String(Date.now());
+      const storagePath = `pre-approvals/${userId}/${prefix}-preapproval.pdf`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { upsert: true });
+
+      if (uploadError) {
+        console.error("offer-builder: pre-approval upload failed", uploadError);
+        setPreApprovalUploadError("Upload failed — please try again.");
+        setPreApprovalUploading(false);
+        return;
+      }
+
+      const savedPath = uploadData?.path ?? storagePath;
+      setPreApprovalPath(savedPath);
+
+      // Insert row into public.documents only when we have an offer_id
+      if (offerId) {
+        const { error: dbError } = await supabase
+          .from("documents")
+          .insert({ offer_id: offerId, type: "pre_approval", storage_path: savedPath });
+        if (dbError) {
+          console.error("offer-builder: documents insert failed", dbError);
+        }
+      }
+    } catch (err) {
+      console.error("offer-builder: pre-approval upload error", err);
+      setPreApprovalUploadError("Upload failed — please try again.");
+    } finally {
+      setPreApprovalUploading(false);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    track({ event: "offer_builder_submitted" });
+    setSubmitError(null);
+
+    // Always update localStorage to mark as submitted
+    try {
+      const saved = localStorage.getItem(storageKey);
+      const parsed = saved ? JSON.parse(saved) : {};
+      localStorage.setItem(storageKey, JSON.stringify({ ...parsed, status: "submitted" }));
+    } catch {}
+
+    if (SUPABASE_ENABLED && user) {
+      setIsSubmitting(true);
+      try {
+        const offerId = supabaseOfferId.current;
+        if (offerId) {
+          const res = await fetch(`/api/offers/${offerId}/submit`, { method: "POST" });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            console.error("offer-builder: failed to submit offer", body);
+            setSubmitError("Failed to submit offer — please try again");
+            setIsSubmitting(false);
+            return;
+          }
+          setIsSubmitting(false);
+          router.push(`/offer-submitted?offerId=${offerId}`);
+          return;
+        } else {
+          // No Supabase row yet — fall through to pricing modal
+          setIsSubmitting(false);
+        }
+      } catch (err) {
+        console.error("offer-builder: submit error", err);
+        setSubmitError("Failed to submit offer — please try again");
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Fallback: open pricing modal when Supabase is not enabled or no row id
+    setShowPricingModal(true);
   };
 
   const set = <K extends keyof D>(k:K, v:D[K]) => setD(p=>({...p,[k]:v}));
@@ -164,15 +475,43 @@ function OfferBuilderInner() {
   const activeSection = SECTIONS.find(s => s.steps.includes(step));
 
   const next = () => {
+    // If leaving the signature step, capture the canvas data first
+    if (step === 15) {
+      const canvas = sigCanvasRef.current;
+      if (canvas && !canvas.isEmpty()) {
+        const dataUrl = canvas.toDataURL("image/png");
+        const updatedD = { ...d, signatureDataUrl: dataUrl, signatureDate: new Date().toISOString() };
+        setD(updatedD);
+        if (!canContinue(step, updatedD)) {
+          setHint(true);
+          setTimeout(() => setHint(false), 3000);
+          return;
+        }
+        const nextStep = Math.min(TOTAL - 1, step + 1);
+        setStep(nextStep);
+        track({ event: "offer_builder_step_completed", step, step_name: activeSection?.label ?? "" });
+        setShowHelper(false);
+        setHint(false);
+        if (nextStep >= 1) {
+          upsertOfferToSupabase(nextStep, updatedD, supabaseOfferId.current);
+        }
+        return;
+      }
+    }
     if (!canContinue(step, d)) {
       setHint(true);
       setTimeout(() => setHint(false), 3000);
       return;
     }
-    setStep(s=>Math.min(TOTAL-1,s+1));
+    const nextStep = Math.min(TOTAL - 1, step + 1);
+    setStep(nextStep);
     track({ event: "offer_builder_step_completed", step, step_name: activeSection?.label ?? "" });
     setShowHelper(false);
     setHint(false);
+    // Supabase auto-save: trigger on advancing to step 2+ (after setup section starts)
+    if (nextStep >= 1) {
+      upsertOfferToSupabase(nextStep, d, supabaseOfferId.current);
+    }
   };
   const back = () => { setStep(s=>Math.max(0,s-1)); setShowHelper(false); setHint(false); };
 
@@ -181,6 +520,11 @@ function OfferBuilderInner() {
   /* ── Nav content (shared between in-flow and sticky) ── */
   const navContent = (
     <>
+      {submitError && (
+        <p role="alert" style={{fontSize:13,color:"var(--red)",fontWeight:500,textAlign:"center",gridColumn:"1/-1",margin:"4px 0 -4px"}}>
+          {submitError}
+        </p>
+      )}
       <button onClick={back} disabled={step===0}
         style={{display:"flex",alignItems:"center",gap:8,padding:"12px 20px",background:"transparent",border:"1.5px solid var(--gray-200)",borderRadius:10,fontSize:14,fontWeight:500,color:"var(--gray-700)",cursor:step===0?"not-allowed":"pointer",opacity:step===0?.4:1}}>
         <ArrowLeft style={{width:15,height:15}}/> Back
@@ -189,7 +533,9 @@ function OfferBuilderInner() {
       <div style={{textAlign:"center"}}>
         <span style={{fontSize:12,color:"var(--gray-400)"}}>{step+1} of {TOTAL}</span>
         {hint && (
-          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>Select an option to continue</p>
+          <p style={{fontSize:12,color:"var(--amber)",fontWeight:500,marginTop:4}}>
+            {step === 15 ? "Please sign and enter your printed name to continue" : "Select an option to continue"}
+          </p>
         )}
       </div>
 
@@ -198,9 +544,9 @@ function OfferBuilderInner() {
             style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:continueDisabled?"not-allowed":"pointer",opacity:continueDisabled?0.5:1,transition:"opacity .15s"}}>
             Continue <ArrowRight style={{width:15,height:15}}/>
           </button>
-        : <button onClick={() => { track({ event: "offer_builder_submitted" }); setShowPricingModal(true); }}
-            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer"}}>
-            Get my offer package <ArrowRight style={{width:15,height:15}}/>
+        : <button onClick={handleFinalSubmit} disabled={isSubmitting}
+            style={{display:"flex",alignItems:"center",gap:8,padding:"12px 28px",background:"var(--blue)",color:"#fff",border:"none",borderRadius:10,fontSize:14,fontWeight:600,cursor:isSubmitting?"not-allowed":"pointer",opacity:isSubmitting?0.6:1,transition:"opacity .15s"}}>
+            {isSubmitting ? "Submitting…" : "Submit offer"} <ArrowRight style={{width:15,height:15}}/>
           </button>
       }
     </>
@@ -290,9 +636,12 @@ function OfferBuilderInner() {
         </div>
 
         {/* ── Main content ── */}
-        <div style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
+        <div className="w-full min-w-0" style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
           <div key={step} className="fade-up">
-            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}/>
+            <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
+              preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}
+              sigCanvasRef={sigCanvasRef as React.RefObject<SignatureCanvas>}
+              scoringResult={scoringResult}/>
           </div>
 
           {/* Nav buttons — desktop only (hidden on mobile) */}
@@ -350,12 +699,12 @@ function OfferBuilderInner() {
               </button>
             </div>
             {/* Property context strip */}
-            <div style={{display:"flex",justifyContent:"space-between",padding:"12px 24px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)",fontSize:13,color:"var(--gray-700)",fontWeight:500}}>
+            <div className="flex flex-wrap items-center justify-between gap-2" style={{padding:"12px 24px",background:"var(--gray-50)",borderBottom:"1px solid var(--gray-200)",fontSize:13,color:"var(--gray-700)",fontWeight:500}}>
               <span>{property.address}, {property.city} {property.state}</span>
               <span>${property.price.toLocaleString()}</span>
             </div>
             {/* Plans */}
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,padding:24}}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{gap:16,padding:24}}>
               {/* Basic */}
               <div style={{border:"1.5px solid var(--gray-200)",borderRadius:12,padding:20}}>
                 <p style={{fontSize:13,fontWeight:600,color:"var(--gray-500)",marginBottom:8}}>BASIC</p>
@@ -417,11 +766,13 @@ export default function OfferBuilderPage() {
 ───────────────────────────────────────────────── */
 type SetFn = <K extends keyof D>(k:K,v:D[K])=>void;
 
-function Q({ title, subtitle, helper, children, showHelper, toggleHelper }:
-  { title:string; subtitle?:string; helper?:string; children:React.ReactNode; showHelper?:boolean; toggleHelper?:()=>void }) {
+function Q({ title, subtitle, helper, children, showHelper, toggleHelper, titleTip }:
+  { title:string; subtitle?:string; helper?:string; children:React.ReactNode; showHelper?:boolean; toggleHelper?:()=>void; titleTip?:string }) {
   return (
     <div>
-      <h1 style={{fontSize:26,fontWeight:700,color:"var(--gray-900)",lineHeight:1.25,marginBottom:subtitle?8:24}}>{title}</h1>
+      <h1 style={{fontSize:26,fontWeight:700,color:"var(--gray-900)",lineHeight:1.25,marginBottom:subtitle?8:24,display:"flex",alignItems:"center",flexWrap:"wrap",gap:4}}>
+        {title}{titleTip && <TermTip tip={titleTip}/>}
+      </h1>
       {subtitle && <p style={{fontSize:15,color:"var(--gray-500)",marginBottom:24,lineHeight:1.6}}>{subtitle}</p>}
       {helper && toggleHelper && (
         <div style={{marginBottom:20}}>
@@ -464,8 +815,11 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
   );
 }
 
-function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue }:
-  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void }) {
+function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
+  preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef, scoringResult }:
+  { step:number; d:D; set:SetFn; showHelper:boolean; toggleHelper:()=>void; property:Property; dateValue:string; setDateValue:(v:string)=>void;
+    preApprovalPath:string|null; preApprovalUploading:boolean; preApprovalUploadError:string|null; preApprovalLocalFile:File|null; onPreApprovalUpload:(f:File)=>Promise<void>;
+    sigCanvasRef: React.RefObject<SignatureCanvas>; scoringResult: ScoringResult }) {
 
   // ── Step 0: Buyer type ──────────────────────────────────────────────
   if (step===0) return (
@@ -529,6 +883,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 2: Pre-approval ────────────────────────────────────────────
   if (step===2) return (
     <Q title="Do you have a mortgage pre-approval?"
+      titleTip={TIPS.preApproval}
       subtitle="This is one of the most important things sellers look at."
       helper="A pre-approval letter from a lender shows the seller you've already been approved for a loan up to a certain amount. It's different from a pre-qualification — sellers take pre-approvals much more seriously. If you're paying all cash, select that option instead."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -550,6 +905,57 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       {d.financeType!=="cash" && d.preApproved===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e"}}>⚠️ <strong>Tip:</strong> Sellers often won't consider offers without pre-approval. We recommend getting one before submitting — it takes 24–48 hours online.</p>
+        </div>
+      )}
+      {/* Pre-qualification vs pre-approval explainer */}
+      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:12,padding:"8px 12px",background:"var(--gray-50)",borderRadius:8,border:"1px solid var(--gray-200)"}}>
+        <TermTip tip={TIPS.preQualification}/>
+        <p style={{fontSize:12,color:"var(--gray-600)",lineHeight:1.5}}>
+          <strong>Pre-approval vs. pre-qualification:</strong> Not sure of the difference? Click the icon.
+        </p>
+      </div>
+      {d.financeType!=="cash" && d.preApproved===true && (
+        <div style={{marginTop:16}}>
+          {preApprovalPath || preApprovalLocalFile ? (
+            <div className="good-box" style={{display:"flex",alignItems:"center",gap:10}}>
+              <CheckCircle style={{width:16,height:16,color:"var(--green)",flexShrink:0}}/>
+              <span style={{fontSize:13,fontWeight:600,color:"#065f46"}}>
+                Pre-approval uploaded ✓
+                {preApprovalLocalFile && !preApprovalPath && " (saved locally)"}
+              </span>
+            </div>
+          ) : (
+            <div style={{border:"1.5px dashed var(--gray-300)",borderRadius:10,padding:"18px 20px",background:"var(--gray-50)"}}>
+              <label style={{display:"block",cursor:"pointer"}}>
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                  <span style={{fontSize:20}}>📎</span>
+                  <span style={{fontSize:14,fontWeight:600,color:"var(--gray-700)"}}>
+                    {preApprovalUploading ? "Uploading…" : "Upload pre-approval letter (PDF)"}
+                  </span>
+                </div>
+                <p style={{fontSize:12,color:"var(--gray-400)",marginBottom:12}}>Accepted: PDF only · Max 10 MB</p>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={preApprovalUploading}
+                  style={{display:"none"}}
+                  onChange={e => {
+                    const f = e.target.files?.[0];
+                    if (f) { onPreApprovalUpload(f); }
+                    e.target.value = "";
+                  }}
+                />
+                <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"9px 18px",background:preApprovalUploading?"var(--gray-200)":"var(--blue)",color:"#fff",borderRadius:8,fontSize:13,fontWeight:600,opacity:preApprovalUploading?0.7:1,transition:"opacity .15s"}}>
+                  {preApprovalUploading ? "Uploading…" : "Choose PDF"}
+                </div>
+              </label>
+              {preApprovalUploadError && (
+                <p role="alert" style={{fontSize:13,color:"var(--red)",fontWeight:500,marginTop:10}}>
+                  {preApprovalUploadError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </Q>
@@ -576,9 +982,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
               `${d.state} Residential Purchase Agreement`
             ],
           ].map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
-              <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
-              <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)",textAlign:"right",maxWidth:"60%"}}>{v}</span>
+            <div key={k} className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1" style={{padding:"10px 0",borderBottom:"1px solid var(--gray-100)"}}>
+              <span style={{fontSize:13,color:"var(--gray-500)",flexShrink:0}}>{k}</span>
+              <span style={{fontSize:13,fontWeight:600,color:"var(--gray-900)",textAlign:"right",maxWidth:"65%"}}>{v}</span>
             </div>
           ))}
         </div>
@@ -690,6 +1096,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     );
     return (
       <Q title="How much are you putting down?"
+        titleTip={TIPS.downPayment}
         subtitle="A larger down payment signals financial strength to sellers."
         helper="Your down payment is the percentage of the home price you pay upfront. The rest is covered by your mortgage. 20% down eliminates Private Mortgage Insurance (PMI), which can add $100–300/month to your payment."
         showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -722,11 +1129,12 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
 
   // ── Step 7: Earnest money ───────────────────────────────────────────
   if (step===7) return (
-    <Q title="How much earnest money will you deposit?"
+    <Q title="How much earnest money (EMD) will you deposit?"
+      titleTip={TIPS.earnestMoney}
       subtitle="This is a good-faith deposit that shows you're serious."
       helper="Earnest money is a deposit you make when your offer is accepted. It's held in an escrow account and applied to your down payment at closing. If you back out for reasons not covered by contingencies, you may lose this money. In Illinois, 2% of the purchase price is standard."
       showHelper={showHelper} toggleHelper={toggleHelper}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
+      <div className="grid grid-cols-3" style={{gap:10,marginBottom:16}}>
         {[1,2,3].map(p=>(
           <button key={p} onClick={()=>set("earnestPct",p)}
             style={{padding:"14px",border:`1.5px solid ${d.earnestPct===p?"var(--blue)":"var(--gray-200)"}`,
@@ -748,6 +1156,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 8: Closing timeline ────────────────────────────────────────
   if (step===8) return (
     <Q title="When do you want to close?"
+      titleTip={TIPS.closingDate}
       subtitle="The closing date is when you get the keys and the home becomes yours."
       helper="The closing date is typically 30–45 days after offer acceptance. This gives time for inspections, appraisal, and your lender to finalize the loan. Sellers sometimes prefer faster or slower closings depending on their situation — offering flexibility can make your offer stand out."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -783,6 +1192,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 9: Inspection contingency ─────────────────────────────────
   if (step===9) return (
     <Q title="Do you want an inspection contingency?"
+      titleTip={TIPS.inspectionContingency}
       subtitle="This lets you back out or renegotiate if the home inspection finds serious problems."
       helper="An inspection contingency gives you the right to hire a professional inspector to examine the home. If they find major issues, you can request repairs, ask for a price reduction, or walk away and get your earnest money back. Waiving this saves time but means you're buying 'as-is' — risky for older homes."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -795,10 +1205,17 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
         selected={d.inspectionContingency===true && d.inspectionDays===7}
         onClick={()=>{set("inspectionContingency",true); set("inspectionDays",7);}}/>
       <OptionCard icon="🚫" label="No — waive the inspection contingency"
-        desc="Strongest offer — but you accept the home in its current condition."
+        desc="Strongest offer — but you accept the home in its current condition (as-is)."
         warn={true}
         selected={d.inspectionContingency===false}
         onClick={()=>set("inspectionContingency",false)}/>
+      {/* As-is tip shown contextually when waiving */}
+      {d.inspectionContingency===false && (
+        <div style={{display:"flex",alignItems:"flex-start",gap:8,padding:"8px 12px",background:"var(--blue-light)",borderRadius:8,marginTop:-4,marginBottom:4}}>
+          <TermTip tip={TIPS.asIs}/>
+          <p style={{fontSize:12,color:"var(--blue)",lineHeight:1.5,marginLeft:2}}>What does <strong>&ldquo;as-is&rdquo;</strong> mean? Click the icon to learn more.</p>
+        </div>
+      )}
       {d.inspectionContingency===false && (
         <div className="warn-box" style={{marginTop:8}}>
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ <strong>High risk:</strong> Without an inspection, you could be responsible for costly hidden defects — HVAC failures, foundation issues, roof damage, etc. We strongly advise against this unless you're very familiar with the property.</p>
@@ -810,6 +1227,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 10: Appraisal contingency ─────────────────────────────────
   if (step===10) return (
     <Q title="Do you want an appraisal contingency?"
+      titleTip={TIPS.appraisalContingency}
       subtitle="This protects you if the bank says the home is worth less than your offer price."
       helper="When you get a mortgage, your lender requires a professional appraisal. If the home appraises below your offer price, the lender won't loan you the full amount. An appraisal contingency lets you renegotiate or back out. Without it, you'd need to cover the gap in cash."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -833,6 +1251,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 11: Financing contingency ─────────────────────────────────
   if (step===11) return (
     <Q title="Do you want a financing contingency?"
+      titleTip={TIPS.financingContingency}
       subtitle="This lets you walk away if your mortgage falls through."
       helper="Even with a pre-approval, mortgages can fall through — your financial situation could change, the property might not qualify, or interest rates could move. A financing contingency means if you can't get your loan within the agreed period, you can back out and get your earnest money back."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -860,6 +1279,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 12: Escalation clause ─────────────────────────────────────
   if (step===12) return (
     <Q title="Do you want an escalation clause?"
+      titleTip={TIPS.escalationClause}
       subtitle="If another buyer makes a higher offer, should yours automatically increase?"
       helper="An escalation clause says: 'I'll beat any other legitimate offer by $X, up to a maximum of $Y.' For example, you might offer $492K and escalate in $2,500 increments up to $510K. This lets you stay competitive without revealing your maximum upfront. It only triggers if there's a real competing offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -873,7 +1293,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
         onClick={()=>set("escalation",false)}/>
       {d.escalation===true && (
         <div className="card-sm" style={{padding:"16px 20px",marginTop:12,border:"1.5px solid #bfdbfe"}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{gap:16}}>
             <div>
               <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Beat competing offers by</label>
               <div style={{position:"relative"}}>
@@ -883,7 +1303,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
               </div>
             </div>
             <div>
-              <label style={{display:"block",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>Up to my maximum</label>
+              <label style={{display:"flex",alignItems:"center",fontSize:12,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+                Up to my maximum (cap)<TermTip tip={TIPS.escalationCap}/>
+              </label>
               <div style={{position:"relative"}}>
                 <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--gray-400)",fontSize:13}}>$</span>
                 <input type="number" value={d.escMax} onChange={e=>set("escMax",+e.target.value)}
@@ -909,6 +1331,7 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
   // ── Step 13: Seller credits ─────────────────────────────────────────
   if (step===13) return (
     <Q title="Are you requesting any seller credits?"
+      titleTip={TIPS.sellerCredits}
       subtitle="Seller credits reduce your closing costs — the seller pays some of your fees."
       helper="Closing costs typically run 2–5% of the loan amount. You can ask the seller to cover some of these costs ('seller concessions'). This is more common in slower markets or when a home has been listed a while. In a very competitive market, asking for credits may weaken your offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>
@@ -965,8 +1388,92 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
     </Q>
   );
 
-  // ── Step 15: Review ─────────────────────────────────────────────────
+  // ── Step 15: Sign your offer ────────────────────────────────────────
   if (step===15) {
+    const hasSig = d.signatureDataUrl !== "";
+    return (
+      <Q title="Sign your offer" subtitle="Draw your signature below to authorize this offer.">
+        {/* Canvas signature pad */}
+        <div style={{marginBottom:20}}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:8}}>
+            Sign here
+          </label>
+          <div style={{
+            border:"2px solid var(--gray-300)",borderRadius:10,overflow:"hidden",
+            background:"#fff",position:"relative",cursor:"crosshair",
+          }}>
+            <SignatureCanvas
+              ref={sigCanvasRef}
+              canvasProps={{width:320,height:180,style:{display:"block",width:"100%",height:180,touchAction:"none"}}}
+              backgroundColor="#ffffff"
+              penColor="#1e293b"
+              onEnd={() => {
+                const canvas = sigCanvasRef.current;
+                if (canvas && !canvas.isEmpty()) {
+                  set("signatureDataUrl", canvas.toDataURL("image/png"));
+                }
+              }}
+            />
+            {/* Baseline guide */}
+            <div style={{position:"absolute",bottom:36,left:16,right:16,borderBottom:"1px dashed var(--gray-300)",pointerEvents:"none"}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:8}}>
+            <p style={{fontSize:12,color:"var(--gray-400)"}}>
+              {hasSig ? "Signature captured" : "Draw your signature in the box above"}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                sigCanvasRef.current?.clear();
+                set("signatureDataUrl","");
+                set("signatureDate","");
+              }}
+              style={{fontSize:12,color:"var(--blue)",background:"none",border:"none",cursor:"pointer",padding:"4px 8px",borderRadius:6,fontWeight:500}}>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {/* Printed name */}
+        <div style={{marginBottom:16}}>
+          <label style={{display:"block",fontSize:13,fontWeight:600,color:"var(--gray-700)",marginBottom:6}}>
+            Printed full name
+          </label>
+          <input
+            type="text"
+            className="input-field"
+            placeholder="Your legal full name"
+            value={d.signatureName}
+            onChange={e=>set("signatureName",e.target.value)}
+          />
+        </div>
+
+        {/* Validation message */}
+        {(!hasSig || d.signatureName.trim()==="") && (
+          <div className="warn-box" style={{marginTop:8}}>
+            <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>
+              {!hasSig && d.signatureName.trim()===""
+                ? "Please draw your signature and enter your printed name to continue."
+                : !hasSig
+                  ? "Please draw your signature to continue."
+                  : "Please enter your printed name to continue."}
+            </p>
+          </div>
+        )}
+
+        {hasSig && d.signatureName.trim()!=="" && (
+          <div className="good-box">
+            <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>
+              Signature captured for <strong>{d.signatureName}</strong>. Click Continue to review your offer.
+            </p>
+          </div>
+        )}
+      </Q>
+    );
+  }
+
+  // ── Step 16: Review ─────────────────────────────────────────────────
+  if (step===16) {
     const rows = [
       {section:"Property",   items:[["Address",`${property.address}, ${property.city}, ${property.state}`],["List price",fmt(property.price)]]},
       {section:"Your Offer", items:[["Offer price",fmt(d.offerPrice)],["vs. asking price",d.offerPrice>=property.price?`+${fmt(d.offerPrice-property.price)} above`:`-${fmt(property.price-d.offerPrice)} below`],["Earnest money",`${d.earnestPct}% · ${fmt(Math.round(d.offerPrice*d.earnestPct/100))}`]]},
@@ -974,9 +1481,61 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       {section:"Timeline",   items:[["Target closing",`${d.closingDays} days`]]},
       {section:"Contingencies", items:[["Inspection",d.inspectionContingency?`Yes · ${d.inspectionDays} days`:"Waived ⚠️"],["Appraisal",d.appraisalContingency?"Yes":"Waived ⚠️"],["Financing",d.financeType==="cash"?"N/A (cash)":d.financingContingency?`Yes · ${d.financingDays} days`:"Waived ⚠️"]]},
       {section:"Terms",      items:[["Escalation",d.escalation?`Yes · up to ${fmt(d.escMax)}`:"No"],["Seller credits",d.sellerCredits>0?fmt(d.sellerCredits):"None"],["Personal letter",d.personalLetter?"Yes":"No"]]},
+      {section:"Signature",  items:[["Signed by",d.signatureName||"—"],["Signed on",d.signatureDate?new Date(d.signatureDate).toLocaleDateString("en-US",{year:"numeric",month:"short",day:"numeric"}):"—"]]},
     ];
+
+    const tierColor = scoringResult.tier === "strong" ? "var(--green)" : scoringResult.tier === "competitive" ? "var(--amber)" : "var(--red)";
+    const tierBg   = scoringResult.tier === "strong" ? "#d1fae5" : scoringResult.tier === "competitive" ? "#fef3c7" : "#fee2e2";
+    const tierLabel = scoringResult.tier === "strong" ? "Strong" : scoringResult.tier === "competitive" ? "Competitive" : "Weak";
+
     return (
       <Q title="Review your offer" subtitle="Everything looks good. Confirm before generating your documents.">
+
+        {/* ── Offer confidence score ── */}
+        <div style={{border:`1.5px solid ${tierColor}`,borderRadius:12,padding:"16px 20px",marginBottom:20,background:tierBg}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div>
+              <p style={{fontSize:12,fontWeight:700,color:tierColor,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:2}}>Offer Confidence Score</p>
+              <div style={{display:"flex",alignItems:"baseline",gap:6}}>
+                <span style={{fontSize:36,fontWeight:800,color:tierColor,lineHeight:1}}>{scoringResult.score}</span>
+                <span style={{fontSize:16,color:tierColor,fontWeight:600}}>/100</span>
+                <span style={{marginLeft:8,fontSize:13,fontWeight:700,padding:"2px 10px",borderRadius:99,background:tierColor,color:"#fff"}}>{tierLabel}</span>
+              </div>
+            </div>
+            {/* Mini score gauge */}
+            <div style={{width:64,height:64,position:"relative",flexShrink:0}}>
+              <svg viewBox="0 0 64 64" style={{width:64,height:64,transform:"rotate(-90deg)"}}>
+                <circle cx="32" cy="32" r="26" fill="none" stroke="#e5e7eb" strokeWidth="6"/>
+                <circle cx="32" cy="32" r="26" fill="none" stroke={tierColor} strokeWidth="6"
+                  strokeDasharray={`${2*Math.PI*26*scoringResult.score/100} ${2*Math.PI*26*(1-scoringResult.score/100)}`}
+                  strokeLinecap="round"/>
+              </svg>
+            </div>
+          </div>
+          {/* Breakdown table */}
+          <div style={{borderTop:`1px solid ${tierColor}`,paddingTop:10,marginTop:4}}>
+            {scoringResult.breakdown.map(row => (
+              <div key={row.label} style={{marginBottom:8}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:3}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"var(--gray-700)"}}>{row.label}</span>
+                  <span style={{fontSize:12,fontWeight:700,color:row.points===row.maxPoints?tierColor:"var(--gray-500)"}}>
+                    {row.points} / {row.maxPoints} pts
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div style={{height:4,background:"rgba(0,0,0,0.08)",borderRadius:2,overflow:"hidden",marginBottom:row.tip&&row.points<row.maxPoints?4:0}}>
+                  <div style={{height:4,background:tierColor,borderRadius:2,width:`${row.maxPoints>0?(row.points/row.maxPoints)*100:0}%`,transition:"width .4s"}}/>
+                </div>
+                {row.tip && row.points < row.maxPoints && (
+                  <p style={{fontSize:11,color:"var(--gray-600)",lineHeight:1.5,marginTop:2}}>
+                    {row.tip}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="card" style={{overflow:"hidden",marginBottom:16}}>
           {rows.map(r=>(
             <div key={r.section}>
@@ -984,22 +1543,22 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
                 <span style={{fontSize:11,fontWeight:700,color:"var(--gray-500)",textTransform:"uppercase",letterSpacing:"0.05em"}}>{r.section}</span>
               </div>
               {r.items.map(([k,v])=>(
-                <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"10px 20px",borderBottom:"1px solid var(--gray-100)"}}>
-                  <span style={{fontSize:13,color:"var(--gray-500)"}}>{k}</span>
-                  <span style={{fontSize:13,fontWeight:600,color: String(v).includes("⚠️")?"var(--amber)":"var(--gray-900)"}}>{v}</span>
+                <div key={k} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1" style={{padding:"10px 20px",borderBottom:"1px solid var(--gray-100)"}}>
+                  <span style={{fontSize:13,color:"var(--gray-500)",flexShrink:0}}>{k}</span>
+                  <span style={{fontSize:13,fontWeight:600,color: String(v).includes("⚠️")?"var(--amber)":"var(--gray-900)",textAlign:"right"}}>{v}</span>
                 </div>
               ))}
             </div>
           ))}
         </div>
         <div className="good-box">
-          <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>✓ Your offer package is ready to generate. You'll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
+          <p style={{fontSize:13,color:"#065f46",lineHeight:1.6}}>Your offer package is ready to generate. You&apos;ll receive a complete, professionally formatted PDF including the Illinois purchase agreement, all addendums, and a cover letter.</p>
         </div>
       </Q>
     );
   }
 
-  // ── Step 16: Submit ─────────────────────────────────────────────────
+  // ── Step 17: Submit ─────────────────────────────────────────────────
   return (
     <Q title="Get your offer package" subtitle="Choose how you'd like to receive and deliver your offer.">
       {[

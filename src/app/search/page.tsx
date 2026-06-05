@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
@@ -11,8 +11,78 @@ import type { Property } from "@/lib/properties";
 import {
   Search, SlidersHorizontal, MapPin, Bed, Bath, Square,
   Heart, TrendingDown, TrendingUp, Sparkles, ChevronDown, Filter,
-  Phone, Mail,
+  Phone, Mail, Bookmark,
 } from "lucide-react";
+
+/* ── Supabase DB row shape (only columns that exist in the schema) ──── */
+interface DbPropertyRow {
+  id: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  price: number;
+  beds: number;
+  baths: number;
+  sqft: number | null;
+  dom: number | null;
+  agent_name: string | null;
+  agent_email: string | null;
+  brokerage: string | null;
+  img: string | null;
+}
+
+/* ── Map a DB row to the Property interface ─────────────────────────── */
+function dbRowToProperty(row: DbPropertyRow): Property {
+  const price = row.price;
+  const dom = row.dom ?? 0;
+  // Deterministic AI score based on first char of UUID
+  const aiScore = (row.id.charCodeAt(0) % 30) + 70;
+  const aiLabel =
+    aiScore >= 90 ? "Best Deal" : aiScore >= 80 ? "Great Value" : "Well-Priced";
+  const marketTrend: string = dom < 10 ? "hot" : dom > 30 ? "cooling" : "neutral";
+  const agentName = row.agent_name ?? "";
+  const agentEmail = row.agent_email ?? "";
+  const img = row.img ?? "";
+  return {
+    id: row.id,
+    address: row.address,
+    city: row.city,
+    state: row.state,
+    zip: row.zip,
+    price,
+    beds: row.beds,
+    baths: row.baths,
+    sqft: row.sqft ?? 0,
+    dom,
+    agent: agentName,
+    agentName,
+    agentPhone: "",
+    agentEmail,
+    brokerage: row.brokerage ?? "",
+    img,
+    photos: img ? [img] : [],
+    type: "Single Family",
+    priceHistory: "same",
+    priceChange: 0,
+    reduced: false,
+    aiScore,
+    aiLabel,
+    aiColor: "text-blue-700 bg-blue-50",
+    suggestedOffer: [Math.round(price * 0.97), Math.round(price * 1.02)],
+    marketTrend,
+  };
+}
+
+const SUPABASE_ENABLED =
+  typeof process !== "undefined" &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+async function getSupabaseClient() {
+  const { createClient } = await import("@/lib/supabase/client");
+  return createClient();
+}
 
 function SearchContent() {
   const router = useRouter();
@@ -26,17 +96,141 @@ function SearchContent() {
   const [beds, setBeds] = useState("any");
   const [propType, setPropType] = useState("any");
 
+  // Save Search popover state
+  const [showSavePopover, setShowSavePopover] = useState(false);
+  const [saveLabel, setSaveLabel] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [saveBanner, setSaveBanner] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Properties state — starts with mock data, replaced by DB data when available
+  const [properties, setProperties] = useState<Property[]>(ALL_PROPERTIES);
+  const [propertiesLoading, setPropertiesLoading] = useState(SUPABASE_ENABLED);
+  const [usingDbProperties, setUsingDbProperties] = useState(false);
+
+  // Realtime new-listings state
+  const [newListingsCount, setNewListingsCount] = useState(0);
+  const pendingNewProps = useRef<Property[]>([]);
+
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const supabase = await getSupabaseClient();
+        const { data, error } = await supabase
+          .from("properties")
+          .select("*")
+          .limit(100);
+        if (cancelled) return;
+        if (error || !data || data.length === 0) {
+          // Fall back to mock data on error or empty result
+          setProperties(ALL_PROPERTIES);
+        } else {
+          setProperties((data as DbPropertyRow[]).map(dbRowToProperty));
+          setUsingDbProperties(true);
+        }
+      } catch {
+        if (!cancelled) setProperties(ALL_PROPERTIES);
+      } finally {
+        if (!cancelled) setPropertiesLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!SUPABASE_ENABLED) return;
+    // Use a stable ref to hold cleanup so the return function can call it
+    const cleanup = { fn: () => {} };
+    getSupabaseClient().then(supabase => {
+      const channel = supabase
+        .channel("properties-inserts")
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "properties" },
+          (payload: { new: unknown }) => {
+            const newProp = dbRowToProperty(payload.new as DbPropertyRow);
+            pendingNewProps.current = [...pendingNewProps.current, newProp];
+            setNewListingsCount(c => c + 1);
+          }
+        )
+        .subscribe();
+      cleanup.fn = () => { supabase.removeChannel(channel); };
+    });
+    return () => { cleanup.fn(); };
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  const filteredProperties = ALL_PROPERTIES.filter(p => {
+  // Close save popover when clicking outside
+  useEffect(() => {
+    if (!showSavePopover) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setShowSavePopover(false);
+        setSaveError("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showSavePopover]);
+
+  // Compute auto-generated label from current filters
+  const computeDefaultLabel = () => {
+    const parts: string[] = [];
+    if (query.trim()) parts.push(query.trim());
+    if (beds !== "any") parts.push(`${beds}+ beds`);
+    if (propType !== "any") parts.push(propType);
+    if (priceMin) parts.push(`from ${priceMin}`);
+    if (priceMax) parts.push(`to ${priceMax}`);
+    return parts.length ? parts.join(" · ") : "My Chicago Search";
+  };
+
+  const handleOpenSavePopover = () => {
+    if (!user) { router.push("/login"); return; }
+    setSaveLabel(computeDefaultLabel());
+    setSaveError("");
+    setShowSavePopover(true);
+  };
+
+  const handleSaveSearch = async () => {
+    setSaveError("");
+    try {
+      const res = await fetch("/api/searches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label: saveLabel,
+          price_min: priceMin ? parseInt(priceMin.replace(/\D/g, "")) : null,
+          price_max: priceMax ? parseInt(priceMax.replace(/\D/g, "")) : null,
+          min_beds: beds !== "any" ? parseInt(beds) : null,
+          property_types: propType !== "any" ? [propType] : [],
+        }),
+      });
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => ({}));
+        const message = (data as { error?: string })?.error ?? "Failed to save search";
+        setSaveError(message);
+        return;
+      }
+      setShowSavePopover(false);
+      setSaveBanner(true);
+      setTimeout(() => setSaveBanner(false), 3000);
+    } catch {
+      setSaveError("Network error — please try again");
+    }
+  };
+
+  const filteredProperties = properties.filter(p => {
     const min = priceMin ? parseInt(priceMin.replace(/[^0-9]/g, ""), 10) : 0;
     const max = priceMax ? parseInt(priceMax.replace(/[^0-9]/g, ""), 10) : Infinity;
     if (p.price < min || p.price > max) return false;
     if (beds !== "any" && p.beds < parseInt(beds, 10)) return false;
-    if (propType !== "any" && p.type !== propType) return false;
+    if (!usingDbProperties && propType !== "any" && p.type !== propType) return false;
     const q = debouncedQuery.trim().toLowerCase();
     if (q && !p.address.toLowerCase().includes(q) && !p.city?.toLowerCase().includes(q)) return false;
     return true;
@@ -69,13 +263,13 @@ function SearchContent() {
             </div>
             <div className="flex gap-2">
               <input type="text" value={priceMin} onChange={e => setPriceMin(e.target.value)} placeholder="Min price"
-                className="w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                className="w-full sm:w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
               <input type="text" value={priceMax} onChange={e => setPriceMax(e.target.value)} placeholder="Max price"
-                className="w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                className="w-full sm:w-28 px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
             <div className="relative">
               <select value={beds} onChange={e => setBeds(e.target.value)}
-                className="appearance-none pl-4 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
+                className="w-full appearance-none pl-4 pr-8 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer">
                 <option value="any">Any beds</option>
                 <option value="1">1+ bd</option>
                 <option value="2">2+ bd</option>
@@ -84,10 +278,47 @@ function SearchContent() {
               </select>
               <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
-            <button className="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white">
+            <button className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white min-h-[44px]">
               <SlidersHorizontal className="w-4 h-4" /> Filters
             </button>
-            <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm">
+            <div className="relative" ref={popoverRef}>
+              <button
+                onClick={handleOpenSavePopover}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-all bg-white min-h-[44px]"
+              >
+                <Bookmark className="w-4 h-4" /> Save search
+              </button>
+              {showSavePopover && (
+                <div className="absolute right-0 top-full mt-2 z-50 bg-white border border-slate-200 rounded-xl shadow-lg p-4 w-72">
+                  <p className="text-sm font-semibold text-slate-800 mb-2">Save this search</p>
+                  <input
+                    type="text"
+                    value={saveLabel}
+                    onChange={e => setSaveLabel(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                    placeholder="Search label"
+                  />
+                  {saveError && (
+                    <p className="text-xs text-red-600 mb-2">{saveError}</p>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleSaveSearch}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg transition-all"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => { setShowSavePopover(false); setSaveError(""); }}
+                      className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm min-h-[44px]">
               <Search className="w-4 h-4" /> Search
             </button>
           </div>
@@ -107,6 +338,13 @@ function SearchContent() {
         </div>
       </div>
 
+      {/* Save search success banner */}
+      {saveBanner && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm font-medium px-6 py-3 rounded-xl shadow-lg">
+          Search saved! We&apos;ll find new matches for you.
+        </div>
+      )}
+
       {/* Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {searchParams.get("welcome") === "1" && (
@@ -118,12 +356,14 @@ function SearchContent() {
             </div>
           </div>
         )}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">{filteredProperties.length} homes for sale in Chicago, IL</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-bold text-slate-900">
+              {propertiesLoading ? "Loading homes..." : `${filteredProperties.length} homes for sale in Chicago, IL`}
+            </h1>
             <p className="text-sm text-slate-500 mt-0.5">Updated {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric"})}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
               <Sparkles className="w-4 h-4 text-blue-500" />
               <span className="text-xs font-medium text-blue-700">AI insights enabled</span>
@@ -137,22 +377,50 @@ function SearchContent() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredProperties.length === 0 ? (
-            <div className="col-span-full py-20 text-center">
-              <p className="text-slate-500 font-medium">No homes match your filters</p>
-              <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
-                className="mt-3 text-sm text-blue-600 hover:underline">
-                Clear filters
-              </button>
-            </div>
-          ) : (
-            filteredProperties.map(p => (
-              <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
-            ))
-          )}
-        </div>
+        {propertiesLoading ? (
+          /* Loading skeleton — 6 placeholder cards */
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm animate-pulse">
+                <div className="h-52 bg-slate-200" />
+                <div className="p-5 space-y-3">
+                  <div className="h-6 bg-slate-200 rounded w-2/3" />
+                  <div className="h-4 bg-slate-100 rounded w-full" />
+                  <div className="h-4 bg-slate-100 rounded w-3/4" />
+                  <div className="h-10 bg-slate-200 rounded-xl mt-4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredProperties.length === 0 ? (
+              <div className="col-span-full py-20 text-center">
+                <p className="text-slate-500 font-medium">No homes match your filters</p>
+                <button onClick={() => { setPriceMin(""); setPriceMax(""); setBeds("any"); setPropType("any"); }}
+                  className="mt-3 text-sm text-blue-600 hover:underline">
+                  Clear filters
+                </button>
+              </div>
+            ) : (
+              filteredProperties.map(p => (
+                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} />
+              ))
+            )}
+          </div>
+        )}
       </div>
+      {newListingsCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-blue-600 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-3 text-sm font-semibold cursor-pointer"
+          onClick={() => {
+            setProperties(prev => [...pendingNewProps.current, ...prev]);
+            pendingNewProps.current = [];
+            setNewListingsCount(0);
+          }}>
+          <Sparkles className="w-4 h-4" />
+          {newListingsCount} new listing{newListingsCount > 1 ? "s" : ""} — click to show
+        </div>
+      )}
       <Footer />
     </div>
   );

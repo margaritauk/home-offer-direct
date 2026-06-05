@@ -9,7 +9,7 @@ export interface UserOffer {
   address: string;
   price: number;
   listPrice: number;
-  status: "pending" | "draft" | "accepted" | "rejected";
+  status: "pending" | "pending_response" | "submitted" | "draft" | "accepted" | "rejected" | "withdrawn" | "cancelled";
   label: string;
   date: string;
   img: string;
@@ -95,6 +95,12 @@ function withTimeout<T>(promise: Promise<T>, ms = 12000): Promise<T> {
   ]);
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 /* ── Supabase path ──────────────────────────────────────────────────── */
 
 async function getSupabaseClient() {
@@ -102,14 +108,59 @@ async function getSupabaseClient() {
   return createClient();
 }
 
-function supabaseUserToAuthUser(sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }, profile?: { name?: string; tier?: string; state?: string }): AuthUser {
+const STATUS_LABEL: Record<string, string> = {
+  draft:     "Draft",
+  submitted: "Submitted",
+  pending:   "Pending review",
+  accepted:  "Accepted",
+  rejected:  "Not accepted",
+  withdrawn: "Withdrawn",
+  cancelled: "Cancelled",
+};
+
+interface DbOfferRow {
+  id: string;
+  status: string;
+  offer_price: number | null;
+  list_price: number | null;
+  property_address: string | null;
+  address: string | null;
+  created_at: string;
+}
+
+function dbRowToUserOffer(row: DbOfferRow): UserOffer {
+  const resolvedAddress = row.property_address ?? row.address ?? "Address not provided";
+  const statusKey = row.status as UserOffer["status"];
+  return {
+    id: row.id,
+    address: resolvedAddress,
+    price: row.offer_price ?? 0,
+    listPrice: row.list_price ?? 0,
+    status: statusKey,
+    label: STATUS_LABEL[row.status] ?? row.status,
+    date: new Date(row.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    img: "",
+  };
+}
+
+async function fetchUserOffers(supabase: Awaited<ReturnType<typeof getSupabaseClient>>, userId: string): Promise<UserOffer[]> {
+  const { data, error } = await supabase
+    .from("offers")
+    .select("id, status, offer_price, list_price, property_address, address, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return (data as DbOfferRow[]).map(dbRowToUserOffer);
+}
+
+function supabaseUserToAuthUser(sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> }, profile?: { name?: string; tier?: string; state?: string }, offers: UserOffer[] = []): AuthUser {
   return {
     id: sbUser.id,
     name: (profile?.name as string) ?? (sbUser.user_metadata?.name as string) ?? sbUser.email ?? "User",
     email: sbUser.email ?? "",
     tier: ((profile?.tier as Tier) ?? "free"),
     state: (profile?.state as string) ?? "IL",
-    offers: [],
+    offers,
     savedHomeIds: [],
   };
 }
@@ -135,7 +186,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .select("name, tier, state")
               .eq("id", data.user.id)
               .single();
-            setUser(supabaseUserToAuthUser(data.user, profile ?? undefined));
+            const offers = await fetchUserOffers(supabase, data.user.id);
+            const authUser = supabaseUserToAuthUser(data.user, profile ?? undefined, offers);
+            const { data: savedRows } = await supabase
+              .from("saved_homes")
+              .select("property_id")
+              .eq("user_id", data.user.id);
+            if (savedRows) {
+              authUser.savedHomeIds = savedRows.map((r: { property_id: string }) => r.property_id);
+            }
+            setUser(authUser);
           }
           setLoading(false);
         });
@@ -149,7 +209,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .select("name, tier, state")
                 .eq("id", session.user.id)
                 .single();
-              setUser(supabaseUserToAuthUser(session.user, profile ?? undefined));
+              const offers = await fetchUserOffers(supabase, session.user.id);
+              const authUser = supabaseUserToAuthUser(session.user, profile ?? undefined, offers);
+              const { data: savedRows } = await supabase
+                .from("saved_homes")
+                .select("property_id")
+                .eq("user_id", session.user.id);
+              if (savedRows) {
+                authUser.savedHomeIds = savedRows.map((r: { property_id: string }) => r.property_id);
+              }
+              setUser(authUser);
             } else {
               setUser(null);
             }
@@ -204,7 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select("name, tier, state")
           .eq("id", sbUser.id)
           .single();
-        setUser(supabaseUserToAuthUser(sbUser, profile ?? undefined));
+        const offers = await fetchUserOffers(supabase, sbUser.id);
+        setUser(supabaseUserToAuthUser(sbUser, profile ?? undefined, offers));
       }
     } else {
       const users = JSON.parse(localStorage.getItem("hod_users") ?? "{}");
@@ -294,19 +364,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const saveHome = (homeId: string) => {
     if (!user) return;
-    const updated = { ...user, savedHomeIds: [...new Set([...user.savedHomeIds, homeId])] };
-    setUser(updated);
-    if (!SUPABASE_CONFIGURED) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (SUPABASE_CONFIGURED) {
+      if (!isValidUUID(homeId)) {
+        // Non-UUID property ID (e.g. mock data) — update state only
+        setUser({ ...user, savedHomeIds: [...new Set([...user.savedHomeIds, homeId])] });
+        return;
+      }
+      const currentUser = user;
+      getSupabaseClient().then((supabase) => {
+        supabase
+          .from("saved_homes")
+          .insert({ user_id: currentUser.id, property_id: homeId })
+          .then(({ error }) => {
+            if (error) {
+              console.error("saveHome: failed to persist to Supabase", error);
+              return;
+            }
+            setUser((prev) => {
+              if (!prev) return prev;
+              return { ...prev, savedHomeIds: [...new Set([...prev.savedHomeIds, homeId])] };
+            });
+          });
+      });
+    } else {
+      const updated = { ...user, savedHomeIds: [...new Set([...user.savedHomeIds, homeId])] };
+      persist(updated);
     }
   };
 
   const unsaveHome = (homeId: string) => {
     if (!user) return;
-    const updated = { ...user, savedHomeIds: user.savedHomeIds.filter(id => id !== homeId) };
-    setUser(updated);
-    if (!SUPABASE_CONFIGURED) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (SUPABASE_CONFIGURED) {
+      if (!isValidUUID(homeId)) {
+        // Non-UUID property ID (e.g. mock data) — update state only
+        setUser({ ...user, savedHomeIds: user.savedHomeIds.filter((id) => id !== homeId) });
+        return;
+      }
+      const currentUser = user;
+      getSupabaseClient().then((supabase) => {
+        supabase
+          .from("saved_homes")
+          .delete()
+          .eq("user_id", currentUser.id)
+          .eq("property_id", homeId)
+          .then(({ error }) => {
+            if (error) {
+              console.error("unsaveHome: failed to delete from Supabase", error);
+              return;
+            }
+            setUser((prev) => {
+              if (!prev) return prev;
+              return { ...prev, savedHomeIds: prev.savedHomeIds.filter((id) => id !== homeId) };
+            });
+          });
+      });
+    } else {
+      const updated = { ...user, savedHomeIds: user.savedHomeIds.filter((id) => id !== homeId) };
+      persist(updated);
     }
   };
 

@@ -6,7 +6,7 @@ import { getPropertyById } from "@/lib/properties";
 import { formatCurrency } from "@/lib/utils";
 import {
   Bed, Bath, MapPin, TrendingUp, TrendingDown, Minus,
-  Sparkles, ArrowRight, CheckCircle2, Clock, Tag,
+  Sparkles, ArrowRight, CheckCircle2, Clock, Tag, AlertCircle,
 } from "lucide-react";
 
 /* ── Confidence factor builder ──────────────────────────────────────── */
@@ -199,17 +199,49 @@ export default async function PropertyPage({
             </div>
           </div>
 
-          {/* CTA */}
+          {/* CTA — gated by listing status (#315) */}
           <div className="px-6 sm:px-8 py-5 bg-slate-50 border-t border-slate-100">
-            <Link
-              href={`/offer-builder?property=${property.id}`}
-              className="inline-flex items-center gap-2 gradient-bg text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm"
-            >
-              Build your offer <ArrowRight className="w-4 h-4"/>
-            </Link>
-            <p className="text-xs text-slate-400 mt-2">
-              Your offer is pre-populated with this property&apos;s details.
-            </p>
+            {property.status === "Sold" || property.status === "Withdrawn" ? (
+              <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-red-700">This listing is no longer active</p>
+                  <p className="text-xs text-red-600 mt-0.5 mb-2">Offers cannot be submitted for {property.status === "Sold" ? "sold" : "withdrawn"} listings.</p>
+                  <Link href="/search" className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:underline">
+                    Search for other homes <ArrowRight className="w-3 h-3"/>
+                  </Link>
+                </div>
+              </div>
+            ) : property.status === "Pending" ? (
+              <div>
+                <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl mb-3">
+                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-700">This listing is under contract</p>
+                    <p className="text-xs text-amber-600 mt-0.5">You can still prepare a backup offer in case the current deal falls through.</p>
+                  </div>
+                </div>
+                <Link
+                  href={`/offer-builder?property=${property.id}&backup=true`}
+                  className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold px-6 py-3 rounded-xl transition-all shadow-sm text-sm"
+                >
+                  Prepare backup offer <ArrowRight className="w-4 h-4"/>
+                </Link>
+                <p className="text-xs text-slate-400 mt-2">Backup offers are contingent on the current deal falling through.</p>
+              </div>
+            ) : (
+              <>
+                <Link
+                  href={`/offer-builder?property=${property.id}`}
+                  className="inline-flex items-center gap-2 gradient-bg text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-all shadow-sm text-sm"
+                >
+                  Build your offer <ArrowRight className="w-4 h-4"/>
+                </Link>
+                <p className="text-xs text-slate-400 mt-2">
+                  Your offer is pre-populated with this property&apos;s details.
+                </p>
+              </>
+            )}
           </div>
         </div>
 

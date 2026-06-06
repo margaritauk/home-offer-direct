@@ -208,6 +208,80 @@ async function getSupabaseClient() {
 }
 
 /* ─────────────────────────────────────────────────
+   #274 — COMPLETENESS BAR
+   Shows overall offer completeness across all required fields.
+───────────────────────────────────────────────── */
+const REQUIRED_FIELDS: { key: keyof D | "signature"; label: string }[] = [
+  { key: "buyerType",             label: "Buyer type" },
+  { key: "state",                 label: "State" },
+  { key: "financeType",           label: "Finance type" },
+  { key: "offerPrice",            label: "Offer price" },
+  { key: "closingDays",           label: "Closing date" },
+  { key: "earnestPct",            label: "Earnest money" },
+  { key: "inspectionContingency", label: "Inspection contingency" },
+  { key: "signature",             label: "Signature" },
+];
+
+function fieldFilled(key: keyof D | "signature", d: D): boolean {
+  if (key === "signature") return d.signatureDataUrl !== "" && d.signatureName.trim() !== "";
+  const v = d[key as keyof D];
+  if (typeof v === "string")  return v.trim() !== "";
+  if (typeof v === "number")  return (v as number) > 0;
+  if (typeof v === "boolean") return true;
+  return v !== null && v !== undefined;
+}
+
+function CompletenessBar({ d }: { d: D }) {
+  const filled = REQUIRED_FIELDS.filter(f => fieldFilled(f.key, d));
+  const pct = Math.round((filled.length / REQUIRED_FIELDS.length) * 100);
+  const missing = REQUIRED_FIELDS.filter(f => !fieldFilled(f.key, d)).slice(0, 3);
+
+  const barColor =
+    pct === 100 ? "var(--green)" :
+    pct >= 70   ? "var(--blue)"  :
+    "var(--amber)";
+
+  return (
+    <div style={{
+      marginBottom: 16,
+      padding: "12px 16px",
+      background: "#fff",
+      border: "1px solid var(--gray-200)",
+      borderRadius: 10,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--gray-700)" }}>Offer completeness</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: barColor }}>{pct}%</span>
+      </div>
+      <div style={{ height: 6, background: "var(--gray-100)", borderRadius: 4, overflow: "hidden" }}>
+        <div style={{
+          height: 6,
+          width: `${pct}%`,
+          background: barColor,
+          borderRadius: 4,
+          transition: "width .4s ease, background .3s ease",
+        }} />
+      </div>
+      {missing.length > 0 && (
+        <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: "4px 8px" }}>
+          <span style={{ fontSize: 11, color: "var(--gray-400)", fontWeight: 500 }}>Still needed:</span>
+          {missing.map(f => (
+            <span key={String(f.key)} style={{
+              fontSize: 11, fontWeight: 600,
+              color: barColor,
+              background: pct === 100 ? "#d1fae5" : pct >= 70 ? "#dbeafe" : "#fef3c7",
+              padding: "1px 7px", borderRadius: 99,
+            }}>
+              {f.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    INNER COMPONENT (uses useSearchParams)
 ───────────────────────────────────────────────── */
 function OfferBuilderInner() {
@@ -694,6 +768,8 @@ function OfferBuilderInner() {
 
         {/* ── Main content ── */}
         <div className="w-full min-w-0" style={{maxWidth:560,paddingBottom:"max(96px, env(safe-area-inset-bottom))"}}>
+          {/* #274 Completeness bar — persists above every step */}
+          <CompletenessBar d={d} />
           <div key={step} className="fade-up">
             <StepView step={step} d={d} set={set} showHelper={showHelper} toggleHelper={()=>setShowHelper(v=>!v)} property={property} dateValue={dateValue} setDateValue={setDateValue}
               preApprovalPath={preApprovalPath} preApprovalUploading={preApprovalUploading} preApprovalUploadError={preApprovalUploadError} preApprovalLocalFile={preApprovalLocalFile} onPreApprovalUpload={handlePreApprovalUpload}

@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const { label, price_min, price_max, min_beds, property_types } = body;
+  const { label, price_min, price_max, min_beds, property_types, alert_frequency } = body;
 
   const { data, error } = await supabase
     .from("saved_searches")
-    .insert({ user_id: user.id, label, price_min, price_max, min_beds, property_types })
+    .insert({ user_id: user.id, label, price_min, price_max, min_beds, property_types, alert_frequency: alert_frequency ?? "daily" })
     .select()
     .single();
 

@@ -31,46 +31,50 @@ export interface Property {
   reduced: boolean;
 }
 
-// Unsplash CDN — specific photo IDs chosen for house/real-estate content
 function u(photoId: string, w = 600, h = 400) {
   return `https://images.unsplash.com/photo-${photoId}?w=${w}&h=${h}&fit=crop&auto=format&q=80`;
 }
 
-// Curated exterior + interior shots for each listing (3 photos each)
-// Exteriors
-const EXT = [
-  "1568605114967-8130f3a36994", // classic brick house
-  "1570129477492-45c003edd2be", // craftsman bungalow
-  "1580587771525-78b9dba3b914", // modern white house
-  "1564013799919-ab600027ffc6", // two-story colonial
-  "1512917774080-9991f1c4c750", // house at dusk
-  "1558618666-fcd25c85cd64",    // Chicago brownstone row
-  "1523217582562-09d0def993a6", // charming cottage
-  "1600596542815-ffad4c1539a9", // luxury home
-  "1600210492493-0946911123ea", // suburban house
-  "1576941089067-2de3c901e126", // brick bungalow
-  "1605276374104-dee2a0ed3cd6", // urban row house
-  "1460317442991-0ec209397118", // mid-rise condo exterior
-  "1486325212027-8081e485255e", // cape cod style
-  "1554995207-c18c203602cb",    // lake house
-  "1502672260266-1c1ef2d93688", // corner lot house
-];
-// Interiors (kitchen / living / bath / bedroom)
-const INT = [
-  "1560185007-c5ca9d2c014d", // modern kitchen
-  "1616594039964-ae9021a400a0", // bright living room
-  "1584622650111-993a426fbf0a", // white kitchen
-  "1560440021-33f9b867899d", // spa bathroom
-  "1505843513577-22bb7d21e455", // master bedroom
-  "1555041469-a586c61ea9bc",    // open living room
-  "1556909114-f6e7ad7d3136",    // eat-in kitchen
-  "1484154218962-a197022b5858", // kitchen island
-  "1528323273322-0eb845b98895", // cozy dining room
-  "1616046229478-9901369b8e17", // modern bathroom
-];
+// Verified exterior house photo IDs from Unsplash
+const EXT: Record<string, string> = {
+  brickLawn:    "_jh0Rx42TzQ", // modern brick house, green lawn
+  rowHouses:    "ItiOAk9yv6Y", // row of houses (townhouse feel)
+  whiteOrange:  "NcVOI8QOyFA", // white house with orange roof
+  brownBrick:   "z11gbBo13ro", // brown and white concrete house
+  modestHouse:  "esx_MLBNOEI", // smaller suburban houses (value listing)
+  woodStone:    "hPu2n_SfV7Q", // modern house, wood and stone
+  twinWhite:    "ntJvpk36rbA", // two white houses side by side
+  modernGarage: "3qRx6B4cT6g", // modern garage doors on white house
+  largePorch:   "8lLy5VR5l1w", // white house with large front porch
+  grayFence:    "j3l5s6TrEi8", // gray house with fence and gravel
+  modernGreen:  "KqrbNYj7QJQ", // modern house nestled in lush greenery
+  hedgesGate:   "4b25Ic2VjiQ", // modern house with manicured hedges
+  greenRoof:    "Rb3HbkNNoLQ", // house with green roof and white pillars
+  patioDusk:    "b7CZPHVtNoc", // modern house with patio
+  porchPlants:  "OKkX8fv8w6I", // white house with porch and green plants
+};
 
-function photos(extIdx: number, intIdx1: number, intIdx2: number, w = 800, h = 600): string[] {
-  return [u(EXT[extIdx], w, h), u(INT[intIdx1], w, h), u(INT[intIdx2], w, h)];
+// Verified interior photo IDs from Unsplash
+const INT: Record<string, string> = {
+  kitchenWood:    "XU_ODlSO9ac", // modern kitchen, wooden cabinets and island
+  kitchenLiving:  "Hnec2oEbbxk", // open kitchen + living, natural wood
+  kitchenWhite:   "-aDGbdTsBZg", // white and brown kitchen cabinet
+  kitchenMarble:  "JyeUdbb9TOg", // large kitchen, marble countertops
+  kitchenSteel:   "htmZWzApbJE", // modern kitchen, stainless steel
+  kitchenIsland:  "YFzqRFFyauw", // kitchen with island
+  kitchenBeige:   "lIVK3z606og", // brown and beige kitchen interior
+  kitchenMinimal: "Fgo8WHmi5T0", // minimalist modern kitchen
+  livingWhite:    "9M66C_w_ToM", // white and brown living room set
+  livingOpen:     "XyGvEj587Mc", // interior of a living room
+  livingAerial:   "e5zPqLcPg2k", // aerial view of living + dining room
+  livingCouch:    "w1w7sQ8md0I", // interior living room of house
+  bedroom1:       "sjMSp5YVf7s", // a bed in a room
+  bedroom2:       "CY26oG9TcFs", // bed next to doorway
+  bedroom3:       "b_GtasP517U", // photography of bedroom
+};
+
+function p(ext: string, int1: string, int2: string): string[] {
+  return [u(EXT[ext], 800, 600), u(INT[int1], 800, 600), u(INT[int2], 800, 600)];
 }
 
 export const ALL_PROPERTIES: Property[] = [
@@ -90,8 +94,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0192",
     agentEmail: "sarah.johnson@coldwellbanker.com",
     brokerage: "Coldwell Banker",
-    img: u(EXT[0]),
-    photos: photos(0, 0, 1),
+    img: u(EXT.brickLawn),
+    photos: p("brickLawn", "kitchenWood", "livingWhite"),
     type: "Single Family",
     priceHistory: "reduced",
     priceChange: -15000,
@@ -118,8 +122,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0341",
     agentEmail: "lpark@bairdwarner.com",
     brokerage: "Baird & Warner",
-    img: u(EXT[5]),
-    photos: photos(5, 2, 5),
+    img: u(EXT.rowHouses),
+    photos: p("rowHouses", "kitchenLiving", "livingOpen"),
     type: "Townhouse",
     priceHistory: "same",
     priceChange: 0,
@@ -146,8 +150,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0847",
     agentEmail: "m.torres@remax.com",
     brokerage: "RE/MAX",
-    img: u(EXT[11]),
-    photos: photos(11, 3, 9),
+    img: u(EXT.whiteOrange),
+    photos: p("whiteOrange", "kitchenBeige", "bedroom1"),
     type: "Condo",
     priceHistory: "reduced",
     priceChange: -20000,
@@ -174,8 +178,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0223",
     agentEmail: "d.keller@compass.com",
     brokerage: "Compass",
-    img: u(EXT[9]),
-    photos: photos(9, 6, 0),
+    img: u(EXT.brownBrick),
+    photos: p("brownBrick", "kitchenMarble", "livingCouch"),
     type: "Single Family",
     priceHistory: "increased",
     priceChange: 10000,
@@ -202,8 +206,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0519",
     agentEmail: "j.wu@atproperties.com",
     brokerage: "@properties",
-    img: u(EXT[1]),
-    photos: photos(1, 7, 4),
+    img: u(EXT.modestHouse),
+    photos: p("modestHouse", "kitchenWhite", "bedroom2"),
     type: "Single Family",
     priceHistory: "reduced",
     priceChange: -25000,
@@ -230,8 +234,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0761",
     agentEmail: "r.bloom@sothebys.com",
     brokerage: "Sotheby's",
-    img: u(EXT[7]),
-    photos: photos(7, 1, 5),
+    img: u(EXT.woodStone),
+    photos: p("woodStone", "kitchenSteel", "livingAerial"),
     type: "Single Family",
     priceHistory: "same",
     priceChange: 0,
@@ -258,8 +262,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0384",
     agentEmail: "t.nguyen@compass.com",
     brokerage: "Compass",
-    img: u(EXT[10]),
-    photos: photos(10, 2, 8),
+    img: u(EXT.twinWhite),
+    photos: p("twinWhite", "kitchenIsland", "livingAerial"),
     type: "Townhouse",
     priceHistory: "same",
     priceChange: 0,
@@ -286,8 +290,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0903",
     agentEmail: "p.novak@jll.com",
     brokerage: "JLL Residential",
-    img: u(EXT[2]),
-    photos: photos(2, 5, 9),
+    img: u(EXT.modernGarage),
+    photos: p("modernGarage", "kitchenMarble", "livingWhite"),
     type: "Condo",
     priceHistory: "reduced",
     priceChange: -50000,
@@ -314,8 +318,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0628",
     agentEmail: "c.reyes@bairdwarner.com",
     brokerage: "Baird & Warner",
-    img: u(EXT[6]),
-    photos: photos(6, 3, 6),
+    img: u(EXT.largePorch),
+    photos: p("largePorch", "kitchenMinimal", "bedroom3"),
     type: "Condo",
     priceHistory: "same",
     priceChange: 0,
@@ -342,8 +346,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(773) 555-0114",
     agentEmail: "a.chen@coldwellbanker.com",
     brokerage: "Coldwell Banker",
-    img: u(EXT[13]),
-    photos: photos(13, 7, 2),
+    img: u(EXT.grayFence),
+    photos: p("grayFence", "kitchenWood", "livingCouch"),
     type: "Multi-Family",
     priceHistory: "reduced",
     priceChange: -15000,
@@ -370,8 +374,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0277",
     agentEmail: "s.harmon@atproperties.com",
     brokerage: "@properties",
-    img: u(EXT[3]),
-    photos: photos(3, 0, 8),
+    img: u(EXT.modernGreen),
+    photos: p("modernGreen", "kitchenSteel", "livingOpen"),
     type: "Single Family",
     priceHistory: "same",
     priceChange: 0,
@@ -398,8 +402,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0461",
     agentEmail: "n.patel@redfin.com",
     brokerage: "Redfin",
-    img: u(EXT[12]),
-    photos: photos(12, 4, 1),
+    img: u(EXT.hedgesGate),
+    photos: p("hedgesGate", "kitchenBeige", "bedroom1"),
     type: "Condo",
     priceHistory: "same",
     priceChange: 0,
@@ -426,8 +430,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(773) 555-0852",
     agentEmail: "k.walsh@koenig-rubloff.com",
     brokerage: "Berkshire Hathaway HS",
-    img: u(EXT[8]),
-    photos: photos(8, 6, 3),
+    img: u(EXT.greenRoof),
+    photos: p("greenRoof", "kitchenLiving", "bedroom2"),
     type: "Single Family",
     priceHistory: "reduced",
     priceChange: -10000,
@@ -454,8 +458,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(773) 555-0338",
     agentEmail: "d.moore@remax.com",
     brokerage: "RE/MAX",
-    img: u(EXT[14]),
-    photos: photos(14, 8, 4),
+    img: u(EXT.patioDusk),
+    photos: p("patioDusk", "kitchenWhite", "bedroom3"),
     type: "Single Family",
     priceHistory: "reduced",
     priceChange: -35000,
@@ -482,8 +486,8 @@ export const ALL_PROPERTIES: Property[] = [
     agentPhone: "(312) 555-0995",
     agentEmail: "m.bell@compass.com",
     brokerage: "Compass",
-    img: u(EXT[4]),
-    photos: photos(4, 1, 9),
+    img: u(EXT.porchPlants),
+    photos: p("porchPlants", "kitchenIsland", "livingOpen"),
     type: "Condo",
     priceHistory: "same",
     priceChange: 0,

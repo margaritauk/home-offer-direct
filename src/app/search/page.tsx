@@ -65,26 +65,15 @@ interface DbPropertyRow {
   img: string | null;
 }
 
-// Verified Unsplash house exterior + interior photo IDs
-const HOUSE_EXTERIOR_IDS = [
-  "_jh0Rx42TzQ", "ItiOAk9yv6Y", "NcVOI8QOyFA", "z11gbBo13ro", "esx_MLBNOEI",
-  "hPu2n_SfV7Q", "ntJvpk36rbA", "3qRx6B4cT6g", "8lLy5VR5l1w", "j3l5s6TrEi8",
-  "KqrbNYj7QJQ", "4b25Ic2VjiQ", "Rb3HbkNNoLQ", "b7CZPHVtNoc", "OKkX8fv8w6I",
-];
-const HOUSE_INTERIOR_IDS = [
-  "XU_ODlSO9ac", "Hnec2oEbbxk", "JyeUdbb9TOg", "htmZWzApbJE", "YFzqRFFyauw",
-  "lIVK3z606og", "9M66C_w_ToM", "XyGvEj587Mc", "e5zPqLcPg2k", "sjMSp5YVf7s",
-];
-
-function unsplash(photoId: string, w = 600, h = 400) {
-  return `https://images.unsplash.com/photo-${photoId}?w=${w}&h=${h}&fit=crop&auto=format&q=80`;
+// loremflickr.com — keyword-filtered real photos, deterministic with ?lock=N
+function flickrImg(category: string, seed: number, w: number, h: number) {
+  return `https://loremflickr.com/${w}/${h}/${category}?lock=${seed}`;
 }
 
-// Pick a photo deterministically from a pool using a hash of the property id
-function pickPhoto(id: string, pool: string[], offset = 0): string {
-  let hash = offset;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return pool[hash % pool.length];
+function idSeed(id: string, offset = 0): number {
+  let h = offset;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return (h % 900) + 1; // 1-900
 }
 
 /* ── Map a DB row to the Property interface ─────────────────────────── */
@@ -99,12 +88,15 @@ function dbRowToProperty(row: DbPropertyRow): Property {
   const agentName = row.agent_name ?? "";
   const agentEmail = row.agent_email ?? "";
 
-  // Always use verified Unsplash house photos — DB img column has landscape placeholders
-  const extId = pickPhoto(row.id, HOUSE_EXTERIOR_IDS);
-  const int1Id = pickPhoto(row.id, HOUSE_INTERIOR_IDS, 1);
-  const int2Id = pickPhoto(row.id, HOUSE_INTERIOR_IDS, 2);
-  const img = unsplash(extId);
-  const photos = [unsplash(extId, 800, 600), unsplash(int1Id, 800, 600), unsplash(int2Id, 800, 600)];
+  const s0 = idSeed(row.id, 0);
+  const s1 = idSeed(row.id, 1);
+  const s2 = idSeed(row.id, 2);
+  const img = flickrImg('house,exterior', s0, 600, 400);
+  const photos = [
+    flickrImg('house,exterior', s0, 800, 600),
+    flickrImg('kitchen', s1, 800, 600),
+    flickrImg('bedroom', s2, 800, 600),
+  ];
 
   return {
     id: row.id,
@@ -686,8 +678,7 @@ function PropertyCard({ property, saved, onToggleSave, onMakeOffer, status }: { 
 
   return (
     <div className={`bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group${isDimmed ? " opacity-60" : ""}`}>
-      <div className="relative h-52 overflow-hidden"
-        style={{background: `linear-gradient(135deg, hsl(${property.id.charCodeAt(0) % 360},35%,82%), hsl(${(property.id.charCodeAt(0) + 80) % 360},35%,70%))`}}>
+      <div className="relative h-52 overflow-hidden bg-slate-200">
         {property.photos[0] && (
           <img
             src={property.photos[0]}

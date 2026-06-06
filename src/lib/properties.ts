@@ -29,6 +29,8 @@ export interface Property {
   marketTrend: string;
   // Dashboard display
   reduced: boolean;
+  // MLS listing status
+  status?: "Active" | "Pending" | "Sold" | "Withdrawn";
 }
 
 function u(photoId: string, w = 600, h = 400) {
@@ -105,6 +107,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [475000, 492000],
     marketTrend: "hot",
     reduced: true,
+    status: "Active",
   },
   {
     id: "2",
@@ -133,6 +136,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [618000, 635000],
     marketTrend: "hot",
     reduced: false,
+    status: "Active",
   },
   {
     id: "3",
@@ -161,6 +165,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [345000, 360000],
     marketTrend: "cooling",
     reduced: true,
+    status: "Active",
   },
   {
     id: "4",
@@ -189,6 +194,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [545000, 565000],
     marketTrend: "hot",
     reduced: false,
+    status: "Active",
   },
   {
     id: "5",
@@ -217,6 +223,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [210000, 225000],
     marketTrend: "cooling",
     reduced: true,
+    status: "Pending",
   },
   {
     id: "6",
@@ -245,6 +252,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [785000, 810000],
     marketTrend: "hot",
     reduced: false,
+    status: "Active",
   },
   {
     id: "7",
@@ -273,6 +281,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [688000, 712000],
     marketTrend: "hot",
     reduced: false,
+    status: "Active",
   },
   {
     id: "8",
@@ -301,6 +310,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [1100000, 1160000],
     marketTrend: "neutral",
     reduced: true,
+    status: "Active",
   },
   {
     id: "9",
@@ -329,6 +339,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [405000, 422000],
     marketTrend: "neutral",
     reduced: false,
+    status: "Active",
   },
   {
     id: "10",
@@ -357,6 +368,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [505000, 525000],
     marketTrend: "cooling",
     reduced: true,
+    status: "Active",
   },
   {
     id: "11",
@@ -385,6 +397,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [865000, 895000],
     marketTrend: "hot",
     reduced: false,
+    status: "Active",
   },
   {
     id: "12",
@@ -413,6 +426,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [330000, 345000],
     marketTrend: "neutral",
     reduced: false,
+    status: "Active",
   },
   {
     id: "13",
@@ -441,6 +455,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [460000, 480000],
     marketTrend: "neutral",
     reduced: true,
+    status: "Active",
   },
   {
     id: "14",
@@ -469,6 +484,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [265000, 285000],
     marketTrend: "cooling",
     reduced: true,
+    status: "Sold",
   },
   {
     id: "15",
@@ -497,6 +513,7 @@ export const ALL_PROPERTIES: Property[] = [
     suggestedOffer: [565000, 588000],
     marketTrend: "neutral",
     reduced: false,
+    status: "Active",
   },
 ];
 

@@ -101,6 +101,16 @@ const STATUS_GUIDANCE: Record<string, string> = {
   withdrawn: "Offer withdrawn. You can start a new offer anytime.",
 };
 
+/* ── Post-acceptance checklist steps ────────────────────────────── */
+const NEXT_STEPS_CHECKLIST = [
+  { id: 1, label: "Review your accepted offer with a licensed real estate attorney", desc: "5-day IL attorney review period begins from acceptance date." },
+  { id: 2, label: "Order a home inspection within your contingency window", desc: "Schedule an inspector as soon as possible to meet your deadline." },
+  { id: 3, label: "Submit your mortgage application if using financing", desc: "Contact your lender immediately to start the formal loan process." },
+  { id: 4, label: "Follow up with your lender for appraisal scheduling", desc: "Your lender will order an appraisal — confirm the timeline." },
+  { id: 5, label: "Clear all contingencies before the deadline", desc: "Remove inspection, financing, and any other contingencies in writing." },
+  { id: 6, label: "Prepare for closing — schedule a final walkthrough", desc: "Do a final walkthrough 24 hours before closing to verify the home's condition." },
+];
+
 /* ── Journey milestones ─────────────────────────────────────────── */
 type MilestoneStatus = "done" | "active" | "upcoming";
 const MILESTONES: { title:string; sub:string; status:MilestoneStatus; date?:string; warn?:boolean }[] = [
@@ -153,6 +163,14 @@ function SignedBadge({ offer }: { offer: ExtendedOffer }) {
 
 type Tab = "overview" | "offers" | "saved" | "journey";
 
+/* ── Saved search row shape (#334) ─────────────────────────────────────── */
+interface SavedSearchRow {
+  id: string;
+  label: string;
+  created_at: string;
+  alert_frequency: "immediate" | "daily" | "weekly" | null;
+}
+
 /* ── Status update modal state ──────────────────────────────────────── */
 interface StatusModalState {
   offerId: string;
@@ -161,6 +179,13 @@ interface StatusModalState {
   notes: string;
   submitting: boolean;
   guidanceMessage: string | null;
+}
+
+/* ── Withdraw confirmation modal state ──────────────────────────────── */
+interface WithdrawModalState {
+  offerId: string;
+  submitting: boolean;
+  error: string | null;
 }
 
 /* ── Verify identity card state ─────────────────────────────────────── */
@@ -191,8 +216,15 @@ export default function DashboardPage() {
   const [dbOffers, setDbOffers] = useState<ExtendedOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
   const [statusModal, setStatusModal] = useState<StatusModalState | null>(null);
+  const [withdrawModal, setWithdrawModal] = useState<WithdrawModalState | null>(null);
+  /* Maps offerId → Set of checked step IDs — persisted to localStorage */
+  const [checklistState, setChecklistState] = useState<Record<string, Set<number>>>({});
   /* Maps offer ID → send-to-agent async state */
   const [sendAgentState, setSendAgentState] = useState<Record<string, SendAgentState>>({});
+
+  /* ── Saved searches state (#334) ─────────────────────────────────── */
+  const [savedSearches, setSavedSearches] = useState<SavedSearchRow[]>([]);
+  const [savedSearchesLoading, setSavedSearchesLoading] = useState(false);
 
   /* ── Identity verification state ─────────────────────────────────── */
   const [verifyState, setVerifyState] = useState<VerifyState>({
@@ -249,6 +281,42 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [user?.id]);
 
+  /* ── Fetch saved searches from Supabase (#334) ───────────────────── */
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED || !user) return;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(user.id)) return;
+
+    let cancelled = false;
+    setSavedSearchesLoading(true);
+
+    (async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr");
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data, error } = await supabase
+          .from("saved_searches")
+          .select("id, label, created_at, alert_frequency")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!cancelled) {
+          if (!error && data) {
+            setSavedSearches(data as SavedSearchRow[]);
+          }
+          setSavedSearchesLoading(false);
+        }
+      } catch {
+        if (!cancelled) setSavedSearchesLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
   /* ── Fetch current verification status from Supabase ─────────────── */
   useEffect(() => {
     if (!SUPABASE_CONFIGURED || !user) return;
@@ -279,6 +347,36 @@ export default function DashboardPage() {
       } catch { /* non-fatal */ }
     })();
   }, [user?.id]);
+
+  /* ── Load acceptance checklist state from localStorage ──────────── */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hod_acceptance_checklist");
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, number[]>;
+        const loaded: Record<string, Set<number>> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          loaded[k] = new Set(v);
+        }
+        setChecklistState(loaded);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  function toggleChecklistStep(offerId: string, stepId: number) {
+    setChecklistState(prev => {
+      const current = new Set(prev[offerId] ?? []);
+      if (current.has(stepId)) current.delete(stepId);
+      else current.add(stepId);
+      const next = { ...prev, [offerId]: current };
+      try {
+        const serializable: Record<string, number[]> = {};
+        for (const [k, s] of Object.entries(next)) serializable[k] = [...s];
+        localStorage.setItem("hod_acceptance_checklist", JSON.stringify(serializable));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   /* ── Handle identity document upload ─────────────────────────────── */
   async function handleVerifyUpload(file: File, type: "id" | "proof_of_funds") {
@@ -391,6 +489,28 @@ export default function DashboardPage() {
     { icon: Heart,    color:"text-red-600 bg-red-50",         title:"Save homes you like", desc:"Heart homes while browsing to track them and contact agents directly.", action:"Browse Homes" },
   ];
 
+  /* ── Saved search handlers (#334) ──────────────────────────────── */
+  async function handleUpdateAlertFrequency(id: string, alert_frequency: "immediate" | "daily" | "weekly") {
+    // Optimistically update
+    setSavedSearches(prev =>
+      prev.map(s => s.id === id ? { ...s, alert_frequency } : s)
+    );
+    try {
+      await fetch(`/api/searches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alert_frequency }),
+      });
+    } catch { /* non-fatal — optimistic update already applied */ }
+  }
+
+  async function handleDeleteSearch(id: string) {
+    setSavedSearches(prev => prev.filter(s => s.id !== id));
+    try {
+      await fetch(`/api/searches/${id}`, { method: "DELETE" });
+    } catch { /* non-fatal */ }
+  }
+
   /* ── Status update handlers ─────────────────────────────────────── */
   function openStatusModal(offer: ExtendedOffer) {
     setStatusModal({
@@ -465,6 +585,35 @@ export default function DashboardPage() {
     }
   }
 
+  /* ── Withdraw offer handler ─────────────────────────────────────── */
+  async function handleWithdrawConfirm() {
+    if (!withdrawModal) return;
+    setWithdrawModal(prev => prev ? { ...prev, submitting: true, error: null } : prev);
+    try {
+      const res = await fetch(`/api/offers/${withdrawModal.offerId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "withdrawn" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to withdraw offer");
+      }
+      const newLabel = STATUS_LABEL["withdrawn"] ?? "Withdrawn";
+      setDbOffers(prev =>
+        prev.map(o =>
+          o.id === withdrawModal.offerId
+            ? { ...o, status: "withdrawn" as UserOffer["status"], label: newLabel }
+            : o
+        )
+      );
+      setWithdrawModal(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to withdraw. Please try again.";
+      setWithdrawModal(prev => prev ? { ...prev, submitting: false, error: msg } : prev);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -533,6 +682,40 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Withdraw Confirmation Modal ────────────────────────────────── */}
+      {withdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-500"/>
+              </div>
+              <h3 className="text-base font-semibold text-slate-900">Withdraw offer?</h3>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed mb-6">
+              Are you sure you want to withdraw this offer? This cannot be undone.
+            </p>
+            {withdrawModal.error && (
+              <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4">{withdrawModal.error}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setWithdrawModal(null)}
+                disabled={withdrawModal.submitting}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 disabled:opacity-50">
+                Cancel
+              </button>
+              <button
+                onClick={handleWithdrawConfirm}
+                disabled={withdrawModal.submitting}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-50">
+                {withdrawModal.submitting ? "Withdrawing…" : "Withdraw offer"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -688,6 +871,72 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* ── Saved Searches section (#334) ─────────────────────────────── */}
+        <div id="saved-searches" className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-slate-900">Saved Searches</h2>
+            <Link href="/search" className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+              + Save a search
+            </Link>
+          </div>
+          {savedSearchesLoading ? (
+            <div className="space-y-3">
+              {[0, 1].map(i => (
+                <div key={i} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-center gap-4 animate-pulse">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-1/3" />
+                    <div className="h-3 bg-slate-100 rounded w-1/4" />
+                  </div>
+                  <div className="h-8 w-32 bg-slate-200 rounded-lg" />
+                </div>
+              ))}
+            </div>
+          ) : savedSearches.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center">
+              <p className="text-sm font-medium text-slate-500">No saved searches yet</p>
+              <p className="text-xs text-slate-400 mt-1 mb-4">Save a search on the listings page to get email alerts for new matches</p>
+              <Link href="/search" className="inline-flex items-center gap-1.5 text-sm text-blue-600 font-semibold hover:underline">
+                Browse listings
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedSearches.map(search => (
+                <div key={search.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{search.label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Saved {new Date(search.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <label className="text-xs text-slate-500 whitespace-nowrap">Alerts:</label>
+                    <div className="relative">
+                      <select
+                        value={search.alert_frequency ?? "daily"}
+                        onChange={e => handleUpdateAlertFrequency(search.id, e.target.value as "immediate" | "daily" | "weekly")}
+                        className="appearance-none text-sm border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+                      >
+                        <option value="immediate">Immediately</option>
+                        <option value="daily">Daily digest</option>
+                        <option value="weekly">Weekly digest</option>
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSearch(search.id)}
+                      className="text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+                      aria-label={`Delete saved search: ${search.label}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 overflow-x-auto" data-testid="tabs">
           {(["overview","offers","saved","journey"] as Tab[]).map(tab => (
@@ -822,27 +1071,41 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {AI_RECS.map(rec => {
-                  const Icon = rec.icon;
-                  return (
-                    <div key={rec.title} className="p-4 sm:p-7">
-                      <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
-                        <Icon className="w-4 h-4" />
+            <div className="space-y-5">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
+                  <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {AI_RECS.map(rec => {
+                    const Icon = rec.icon;
+                    return (
+                      <div key={rec.title} className="p-4 sm:p-7">
+                        <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-900 mb-2">{rec.title}</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-4">{rec.desc}</p>
+                        <Link href={rec.action === "Browse Homes" ? "/search" : "/offer-builder"}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                          {rec.action} <ChevronRight className="w-3 h-3" />
+                        </Link>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-2">{rec.title}</h3>
-                      <p className="text-xs text-slate-500 leading-relaxed mb-4">{rec.desc}</p>
-                      <Link href={rec.action === "Browse Homes" ? "/search" : "/offer-builder"}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                        {rec.action} <ChevronRight className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Next Steps — service providers shortcut */}
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                <h2 className="font-semibold text-slate-900 text-sm mb-1">Next Steps</h2>
+                <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                  When your offer is accepted you&apos;ll need attorneys, inspectors, lenders, and movers. Get ahead of it now.
+                </p>
+                <Link href="/services"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+                  Browse service providers <ChevronRight className="w-3 h-3"/>
+                </Link>
               </div>
             </div>
           </div>
@@ -874,10 +1137,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              (["pending","submitted","draft","accepted","rejected","withdrawn"] as const).map(status => {
+              (["pending","counter","submitted","draft","accepted","rejected","withdrawn"] as const).map(status => {
                 const group = activeOffers.filter(o => o.status === status);
                 if (!group.length) return null;
-                const statusLabel = { pending:"Pending", submitted:"Submitted", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted", withdrawn:"Withdrawn" }[status];
+                const statusLabel = { pending:"Pending", counter:"Counter-Offer Received", submitted:"Submitted", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted", withdrawn:"Withdrawn" }[status];
                 return (
                   <div key={status}>
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">{statusLabel}</h3>
@@ -917,6 +1180,39 @@ export default function DashboardPage() {
                                 <span className="font-medium text-slate-700">Notes: </span>{offer.notes}
                               </p>
                             )}
+                            {/* ── Post-acceptance checklist ──────────────────────── */}
+                            {offer.status === "accepted" && (
+                              <div className="mt-5 bg-green-50 border border-green-200 rounded-xl p-4 sm:p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0"/>
+                                  <h4 className="text-sm font-semibold text-green-800">What happens next?</h4>
+                                  <Link href="/services" className="ml-auto text-xs text-green-700 font-semibold hover:underline flex items-center gap-1">
+                                    Find service providers <ChevronRight className="w-3 h-3"/>
+                                  </Link>
+                                </div>
+                                <ol className="space-y-3">
+                                  {NEXT_STEPS_CHECKLIST.map(step => {
+                                    const checked = checklistState[offer.id]?.has(step.id) ?? false;
+                                    return (
+                                      <li key={step.id} className="flex items-start gap-3">
+                                        <button
+                                          onClick={() => toggleChecklistStep(offer.id, step.id)}
+                                          aria-label={checked ? `Uncheck: ${step.label}` : `Check: ${step.label}`}
+                                          className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-green-600 border-green-600" : "border-green-400 bg-white hover:border-green-600"}`}>
+                                          {checked && <CheckCircle2 className="w-3 h-3 text-white"/>}
+                                        </button>
+                                        <div>
+                                          <p className={`text-xs font-semibold leading-snug ${checked ? "line-through text-slate-400" : "text-slate-800"}`}>
+                                            {step.id}. {step.label}
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.desc}</p>
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              </div>
+                            )}
                             <div className="flex items-center gap-2 sm:gap-3 mt-4 sm:mt-6 flex-wrap">
                               {offer.status==="draft" && (
                                 <Link href="/offer-builder"
@@ -927,6 +1223,13 @@ export default function DashboardPage() {
                               {offer.status==="pending" && (
                                 <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100">
                                   <MessageSquare className="w-4 h-4"/> Follow Up
+                                </button>
+                              )}
+                              {(offer.status==="pending" || offer.status==="counter") && (
+                                <button
+                                  onClick={() => setWithdrawModal({ offerId: offer.id, submitting: false, error: null })}
+                                  className="flex items-center gap-1.5 text-sm px-4 py-2 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 border border-red-100">
+                                  <X className="w-4 h-4"/> Withdraw
                                 </button>
                               )}
                               {offer.status==="rejected" && (

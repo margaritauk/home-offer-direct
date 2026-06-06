@@ -236,7 +236,7 @@ export async function POST(
   /* ── Fetch offer (RLS enforces ownership) ── */
   const { data: offerData, error: fetchError } = await supabase
     .from("offers")
-    .select("id, user_id, offer_price, address, property_address, terms, status, pdf_url, created_at")
+    .select("id, user_id, offer_price, address, property_address, terms, status, pdf_url, created_at, sent_to_agent_at")
     .eq("id", id)
     .single();
 
@@ -244,7 +244,7 @@ export async function POST(
     return NextResponse.json({ error: "Offer not found" }, { status: 404 });
   }
 
-  const offer = offerData as OfferRow & { status: string; pdf_url?: string | null; created_at: string };
+  const offer = offerData as OfferRow & { status: string; pdf_url?: string | null; created_at: string; sent_to_agent_at?: string | null };
   const terms = (offer.terms ?? {}) as Record<string, unknown>;
 
   /* ── Validate: must be submitted and signed ── */
@@ -252,6 +252,14 @@ export async function POST(
     return NextResponse.json(
       { error: "Offer must be submitted before sending to agent" },
       { status: 422 }
+    );
+  }
+
+  /* ── Idempotency: don't email the agent twice (retry / double-click) ── */
+  if (offer.sent_to_agent_at) {
+    return NextResponse.json(
+      { error: "This offer has already been sent to the agent", alreadySent: true },
+      { status: 409 }
     );
   }
 
@@ -273,6 +281,15 @@ export async function POST(
     );
   }
 
+  /* ── Validate the agent email format before handing it to the provider ── */
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!EMAIL_RE.test(agentEmail)) {
+    return NextResponse.json(
+      { error: "The listing agent's email address doesn't look valid — please correct it in your offer" },
+      { status: 422 }
+    );
+  }
+
   /* ── Get buyer display name ── */
   const buyerName =
     (typeof terms.buyerName === "string" && terms.buyerName.trim())
@@ -284,44 +301,81 @@ export async function POST(
   const address = offer.property_address ?? offer.address ?? "the property";
   const offerPrice = offer.offer_price ?? 0;
 
-  /* ── Fetch or render PDF ── */
+  /* ── Fetch or render PDF (any render failure → clean 500, not an unhandled crash) ── */
   let pdfBuffer: Buffer;
 
-  if (offer.pdf_url) {
-    /* Try to download existing PDF from Storage */
-    try {
-      const serviceClient = createServiceClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-      );
+  try {
+    if (offer.pdf_url) {
+      /* Try to download existing PDF from Storage */
+      try {
+        const serviceClient = createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
 
-      /* Extract storage path from the public URL */
-      const urlObj = new URL(offer.pdf_url);
-      // Public URL format: .../storage/v1/object/public/<bucket>/<path>
-      const pathMatch = urlObj.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
-      if (pathMatch) {
-        const bucket = pathMatch[1];
-        const storagePath = pathMatch[2];
-        const { data: fileData, error: downloadError } = await serviceClient.storage
-          .from(bucket)
-          .download(storagePath);
+        /* Extract storage path from the public URL */
+        const urlObj = new URL(offer.pdf_url);
+        // Public URL format: .../storage/v1/object/public/<bucket>/<path>
+        const pathMatch = urlObj.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+        if (pathMatch) {
+          const bucket = pathMatch[1];
+          const storagePath = pathMatch[2];
+          const { data: fileData, error: downloadError } = await serviceClient.storage
+            .from(bucket)
+            .download(storagePath);
 
-        if (!downloadError && fileData) {
-          const arrayBuf = await fileData.arrayBuffer();
-          pdfBuffer = Buffer.from(arrayBuf);
+          if (!downloadError && fileData) {
+            const arrayBuf = await fileData.arrayBuffer();
+            pdfBuffer = Buffer.from(arrayBuf);
+          } else {
+            throw new Error("Storage download failed");
+          }
         } else {
-          throw new Error("Storage download failed");
+          throw new Error("Could not parse storage path from pdf_url");
         }
-      } else {
-        throw new Error("Could not parse storage path from pdf_url");
+      } catch {
+        /* Fall through to inline render */
+        pdfBuffer = await renderPdfInline(offer as OfferRow, supabase);
       }
-    } catch {
-      /* Fall through to inline render */
+    } else {
+      /* No cached PDF — render inline */
       pdfBuffer = await renderPdfInline(offer as OfferRow, supabase);
     }
-  } else {
-    /* No cached PDF — render inline */
-    pdfBuffer = await renderPdfInline(offer as OfferRow, supabase);
+  } catch (err) {
+    console.error("[send-to-agent] PDF generation failed:", err);
+    return NextResponse.json(
+      { error: "Could not generate the offer PDF. Please try again." },
+      { status: 500 }
+    );
+  }
+
+  /* ── Atomically claim the send BEFORE emailing, so a retry / double-click
+        can't send twice. Only the request that flips sent_to_agent_at from
+        NULL proceeds; a concurrent one gets 0 rows back and bails. ── */
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data: claimed, error: claimError } = await serviceClient
+    .from("offers")
+    .update({ sent_to_agent_at: new Date().toISOString() })
+    .eq("id", id)
+    .is("sent_to_agent_at", null)
+    .select("id");
+
+  if (claimError) {
+    console.error("[send-to-agent] claim error:", claimError.message);
+    return NextResponse.json(
+      { error: "Failed to send email. Please try again." },
+      { status: 500 }
+    );
+  }
+  if (!claimed || claimed.length === 0) {
+    return NextResponse.json(
+      { error: "This offer has already been sent to the agent", alreadySent: true },
+      { status: 409 }
+    );
   }
 
   /* ── Build and send email via Resend ── */
@@ -354,22 +408,16 @@ export async function POST(
 
   if (sendError) {
     console.error("[send-to-agent] Resend error", sendError);
+    /* Roll back the claim so the user can retry the send. */
+    await serviceClient
+      .from("offers")
+      .update({ sent_to_agent_at: null })
+      .eq("id", id);
     return NextResponse.json(
       { error: "Failed to send email. Please try again." },
       { status: 500 }
     );
   }
-
-  /* ── Stamp sent_to_agent_at on the offer row ── */
-  const serviceClient = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
-
-  await serviceClient
-    .from("offers")
-    .update({ sent_to_agent_at: new Date().toISOString() })
-    .eq("id", id);
 
   return NextResponse.json({ success: true, sentTo: agentEmail });
 }

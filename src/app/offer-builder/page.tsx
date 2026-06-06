@@ -949,6 +949,228 @@ function OptionCard({ label, desc, icon, selected, onClick, badge, warn }:
   );
 }
 
+/* ─────────────────────────────────────────────────
+   #153 — POST-NAR SELLER CREDITS TIP
+───────────────────────────────────────────────── */
+function NarSellerCreditsTip({ offerPrice }: { offerPrice: number }) {
+  const [open, setOpen] = useState(false);
+  const cap = fmt(Math.round(offerPrice * 0.03));
+  return (
+    <div style={{
+      marginBottom: 16,
+      border: "1.5px solid #bfdbfe",
+      borderRadius: 10,
+      overflow: "hidden",
+      background: "var(--blue-light)",
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px",
+          background: "transparent", border: "none", cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>💡</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--blue)" }}>Post-NAR tip: seller credits</span>
+        </div>
+        {open
+          ? <ChevronUp style={{ width: 14, height: 14, color: "var(--blue)", flexShrink: 0 }} />
+          : <ChevronDown style={{ width: 14, height: 14, color: "var(--blue)", flexShrink: 0 }} />}
+      </button>
+      {open && (
+        <div style={{ padding: "0 16px 14px", borderTop: "1px solid #bfdbfe" }}>
+          <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.65, marginTop: 10 }}>
+            <strong>Post-NAR tip:</strong> You can ask the seller to contribute up to 3% of the purchase price
+            ({cap}) toward your closing costs. This is now negotiated directly — no agent required.
+            Seller credits became easier to negotiate after the 2024 NAR settlement removed rules that limited
+            how buyer&apos;s agent compensation was disclosed.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   #155 — ESCALATION CLAUSE EXPLAINER
+───────────────────────────────────────────────── */
+function EscalationExplainer({ offerPrice }: { offerPrice: number }) {
+  const [open, setOpen] = useState(false);
+  const base = offerPrice > 0 ? offerPrice : 490000;
+  const capEx = base + 20000;
+  return (
+    <div style={{
+      marginBottom: 16,
+      border: "1.5px solid var(--gray-200)",
+      borderRadius: 10,
+      overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px",
+          background: "var(--gray-50)", border: "none", cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Info style={{ width: 14, height: 14, color: "var(--blue)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)" }}>What is an escalation clause?</span>
+        </div>
+        {open
+          ? <ChevronUp style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />
+          : <ChevronDown style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />}
+      </button>
+      {open && (
+        <div style={{ padding: "12px 16px 14px", borderTop: "1px solid var(--gray-200)", background: "#fff" }}>
+          <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.65, marginBottom: 10 }}>
+            An <strong>escalation clause</strong> automatically raises your offer by a set increment above any
+            competing offer, up to a maximum cap you choose. It keeps you competitive without revealing your
+            absolute top price upfront — the clause only activates if there is a real, documented competing offer.
+          </p>
+          <div style={{
+            padding: "10px 14px", background: "var(--blue-light)",
+            borderRadius: 8, border: "1px solid #bfdbfe", marginBottom: 10,
+          }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--blue)", marginBottom: 4 }}>Example</p>
+            <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.6 }}>
+              Offer <strong>{fmt(base)}</strong>, escalate by <strong>$2,000</strong> above any competing offer,
+              up to a maximum of <strong>{fmt(capEx)}</strong>.
+            </p>
+          </div>
+          <p style={{ fontSize: 12, color: "var(--gray-500)", lineHeight: 1.6 }}>
+            <strong>Illinois note:</strong> Escalation clauses are permitted in Illinois and must be included
+            in writing as part of the purchase agreement.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   #279 — APPRAISAL GAP RISK EXPLAINER
+───────────────────────────────────────────────── */
+function AppraisalGapCard({ offerPrice, listPrice }: { offerPrice: number; listPrice: number }) {
+  const [open, setOpen] = useState(false);
+  const gap = Math.max(0, offerPrice - listPrice);
+  return (
+    <div style={{
+      marginBottom: 12,
+      border: "1.5px solid var(--gray-200)",
+      borderRadius: 10,
+      overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px",
+          background: "var(--gray-50)", border: "none", cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Info style={{ width: 14, height: 14, color: "var(--amber)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)" }}>Appraisal gap risk — what should I know?</span>
+        </div>
+        {open
+          ? <ChevronUp style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />
+          : <ChevronDown style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />}
+      </button>
+      {open && (
+        <div style={{ padding: "12px 16px 14px", borderTop: "1px solid var(--gray-200)", background: "#fff" }}>
+          <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.65, marginBottom: 10 }}>
+            <strong>Appraisal gap risk:</strong> If the home appraises below your offer price, your lender will
+            only finance the appraised value. You&apos;d need to cover the &ldquo;gap&rdquo; in cash, renegotiate
+            the price with the seller, or walk away.
+          </p>
+          {gap > 0 && (
+            <div style={{
+              padding: "10px 14px", background: "#fef3c7",
+              borderRadius: 8, border: "1px solid var(--amber)", marginBottom: 10,
+            }}>
+              <p style={{ fontSize: 13, color: "#92400e", lineHeight: 1.6 }}>
+                You&apos;re offering <strong>{fmt(offerPrice)}</strong> — <strong>{fmt(gap)} above asking</strong>.
+                If the home appraises at asking price, you may need <strong>{fmt(gap)} extra in cash</strong> to close.
+              </p>
+            </div>
+          )}
+          <p style={{ fontSize: 12, color: "var(--gray-500)", lineHeight: 1.6 }}>
+            In hot markets, buyers sometimes include an <strong>appraisal gap guarantee</strong> — a written
+            commitment to cover a set amount of any gap — to make their offer more competitive.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
+   #282 — INSPECTION CONTINGENCY vs INFORMATIONAL
+───────────────────────────────────────────────── */
+function InspectionTypesCard() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      marginTop: 12,
+      border: "1.5px solid var(--gray-200)",
+      borderRadius: 10,
+      overflow: "hidden",
+    }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          width: "100%", textAlign: "left",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px",
+          background: "var(--gray-50)", border: "none", cursor: "pointer",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Info style={{ width: 14, height: 14, color: "var(--blue)", flexShrink: 0 }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--gray-700)" }}>Contingency vs. informational inspection — what&apos;s the difference?</span>
+        </div>
+        {open
+          ? <ChevronUp style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />
+          : <ChevronDown style={{ width: 14, height: 14, color: "var(--gray-400)", flexShrink: 0 }} />}
+      </button>
+      {open && (
+        <div style={{ padding: "12px 16px 14px", borderTop: "1px solid var(--gray-200)", background: "#fff" }}>
+          <div style={{ marginBottom: 12 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 4 }}>Standard inspection contingency</p>
+            <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.65 }}>
+              Gives you the right to back out or renegotiate the price if the inspection reveals
+              significant issues — structural problems, HVAC failures, roof damage, etc. Your earnest
+              money is protected if you exercise this right within the contingency window.
+            </p>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--gray-900)", marginBottom: 4 }}>Informational inspection (no contingency)</p>
+            <p style={{ fontSize: 13, color: "var(--gray-700)", lineHeight: 1.65 }}>
+              You still hire an inspector and get the full report — but you <strong>waive your right</strong> to
+              use the findings to renegotiate or walk away. Common in competitive markets where sellers
+              want clean offers. You proceed knowing the home&apos;s condition.
+            </p>
+          </div>
+          <div style={{
+            padding: "8px 12px", background: "var(--blue-light)",
+            borderRadius: 8, border: "1px solid #bfdbfe",
+          }}>
+            <p style={{ fontSize: 12, color: "var(--blue)", lineHeight: 1.6 }}>
+              HomeOfferDirect supports both — use the options above to choose which applies to your offer.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue, setDateValue,
   preApprovalPath, preApprovalUploading, preApprovalUploadError, preApprovalLocalFile, onPreApprovalUpload, sigCanvasRef, scoringResult,
   sigMode, setSigMode }:
@@ -1194,6 +1416,9 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
             width:`${Math.min(100,Math.max(5,50+(d.offerPrice-property.price)/property.price*300))}%`}}/>
         </div>
       </div>}
+
+      {/* #155 Escalation clause explainer */}
+      <EscalationExplainer offerPrice={d.offerPrice} />
     </Q>
   );
 
@@ -1358,6 +1583,8 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ <strong>High risk:</strong> Without an inspection, you could be responsible for costly hidden defects — HVAC failures, foundation issues, roof damage, etc. We strongly advise against this unless you're very familiar with the property.</p>
         </div>
       )}
+      {/* #282 Inspection contingency vs informational inspection */}
+      <InspectionTypesCard />
     </Q>
   );
 
@@ -1382,6 +1609,8 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
           <p style={{fontSize:13,color:"#92400e",lineHeight:1.6}}>⚠️ You offered {fmt(d.offerPrice)} ({d.offerPrice > property.price ? fmt(d.offerPrice-property.price)+" above asking" : "at or below asking"}). If the home appraises at asking price, you'd need an extra <strong>{fmt(Math.max(0, d.offerPrice-property.price))} in cash at closing</strong>.</p>
         </div>
       )}
+      {/* #279 Appraisal gap risk explainer */}
+      <AppraisalGapCard offerPrice={d.offerPrice > 0 ? d.offerPrice : property.price} listPrice={property.price} />
     </Q>
   );
 
@@ -1472,6 +1701,8 @@ function StepView({ step, d, set, showHelper, toggleHelper, property, dateValue,
       subtitle="Seller credits reduce your closing costs — the seller pays some of your fees."
       helper="Closing costs typically run 2–5% of the loan amount. You can ask the seller to cover some of these costs ('seller concessions'). This is more common in slower markets or when a home has been listed a while. In a very competitive market, asking for credits may weaken your offer."
       showHelper={showHelper} toggleHelper={toggleHelper}>
+      {/* #153 Post-NAR tip */}
+      <NarSellerCreditsTip offerPrice={d.offerPrice > 0 ? d.offerPrice : property.price} />
       <OptionCard icon="🙅" label="No seller credits"
         desc={`${property.dom<=14?"This market is competitive — skipping credits strengthens your offer.":"A clean offer is usually preferred."}`}
         badge={property.dom<=14?"Recommended":""}

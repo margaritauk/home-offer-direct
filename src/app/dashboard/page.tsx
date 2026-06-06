@@ -163,6 +163,14 @@ function SignedBadge({ offer }: { offer: ExtendedOffer }) {
 
 type Tab = "overview" | "offers" | "saved" | "journey";
 
+/* ── Saved search row shape (#334) ─────────────────────────────────────── */
+interface SavedSearchRow {
+  id: string;
+  label: string;
+  created_at: string;
+  alert_frequency: "immediate" | "daily" | "weekly" | null;
+}
+
 /* ── Status update modal state ──────────────────────────────────────── */
 interface StatusModalState {
   offerId: string;
@@ -214,6 +222,10 @@ export default function DashboardPage() {
   /* Maps offer ID → send-to-agent async state */
   const [sendAgentState, setSendAgentState] = useState<Record<string, SendAgentState>>({});
 
+  /* ── Saved searches state (#334) ─────────────────────────────────── */
+  const [savedSearches, setSavedSearches] = useState<SavedSearchRow[]>([]);
+  const [savedSearchesLoading, setSavedSearchesLoading] = useState(false);
+
   /* ── Identity verification state ─────────────────────────────────── */
   const [verifyState, setVerifyState] = useState<VerifyState>({
     idUploaded: false,
@@ -263,6 +275,42 @@ export default function DashboardPage() {
         }
       } catch {
         if (!cancelled) setOffersLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  /* ── Fetch saved searches from Supabase (#334) ───────────────────── */
+  useEffect(() => {
+    if (!SUPABASE_CONFIGURED || !user) return;
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_REGEX.test(user.id)) return;
+
+    let cancelled = false;
+    setSavedSearchesLoading(true);
+
+    (async () => {
+      try {
+        const { createBrowserClient } = await import("@supabase/ssr");
+        const supabase = createBrowserClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+        const { data, error } = await supabase
+          .from("saved_searches")
+          .select("id, label, created_at, alert_frequency")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (!cancelled) {
+          if (!error && data) {
+            setSavedSearches(data as SavedSearchRow[]);
+          }
+          setSavedSearchesLoading(false);
+        }
+      } catch {
+        if (!cancelled) setSavedSearchesLoading(false);
       }
     })();
 
@@ -440,6 +488,28 @@ export default function DashboardPage() {
     { icon: Sparkles, color:"text-emerald-600 bg-emerald-50", title:"Start your first offer", desc:"Browse listings and build a professional offer in under 30 minutes.", action:"Browse Homes" },
     { icon: Heart,    color:"text-red-600 bg-red-50",         title:"Save homes you like", desc:"Heart homes while browsing to track them and contact agents directly.", action:"Browse Homes" },
   ];
+
+  /* ── Saved search handlers (#334) ──────────────────────────────── */
+  async function handleUpdateAlertFrequency(id: string, alert_frequency: "immediate" | "daily" | "weekly") {
+    // Optimistically update
+    setSavedSearches(prev =>
+      prev.map(s => s.id === id ? { ...s, alert_frequency } : s)
+    );
+    try {
+      await fetch(`/api/searches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alert_frequency }),
+      });
+    } catch { /* non-fatal — optimistic update already applied */ }
+  }
+
+  async function handleDeleteSearch(id: string) {
+    setSavedSearches(prev => prev.filter(s => s.id !== id));
+    try {
+      await fetch(`/api/searches/${id}`, { method: "DELETE" });
+    } catch { /* non-fatal */ }
+  }
 
   /* ── Status update handlers ─────────────────────────────────────── */
   function openStatusModal(offer: ExtendedOffer) {
@@ -800,6 +870,72 @@ export default function DashboardPage() {
             )}
           </div>
         )}
+
+        {/* ── Saved Searches section (#334) ─────────────────────────────── */}
+        <div id="saved-searches" className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-slate-900">Saved Searches</h2>
+            <Link href="/search" className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+              + Save a search
+            </Link>
+          </div>
+          {savedSearchesLoading ? (
+            <div className="space-y-3">
+              {[0, 1].map(i => (
+                <div key={i} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex items-center gap-4 animate-pulse">
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-slate-200 rounded w-1/3" />
+                    <div className="h-3 bg-slate-100 rounded w-1/4" />
+                  </div>
+                  <div className="h-8 w-32 bg-slate-200 rounded-lg" />
+                </div>
+              ))}
+            </div>
+          ) : savedSearches.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center">
+              <p className="text-sm font-medium text-slate-500">No saved searches yet</p>
+              <p className="text-xs text-slate-400 mt-1 mb-4">Save a search on the listings page to get email alerts for new matches</p>
+              <Link href="/search" className="inline-flex items-center gap-1.5 text-sm text-blue-600 font-semibold hover:underline">
+                Browse listings
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {savedSearches.map(search => (
+                <div key={search.id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{search.label}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Saved {new Date(search.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <label className="text-xs text-slate-500 whitespace-nowrap">Alerts:</label>
+                    <div className="relative">
+                      <select
+                        value={search.alert_frequency ?? "daily"}
+                        onChange={e => handleUpdateAlertFrequency(search.id, e.target.value as "immediate" | "daily" | "weekly")}
+                        className="appearance-none text-sm border border-slate-200 rounded-lg pl-3 pr-7 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+                      >
+                        <option value="immediate">Immediately</option>
+                        <option value="daily">Daily digest</option>
+                        <option value="weekly">Weekly digest</option>
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <button
+                      onClick={() => handleDeleteSearch(search.id)}
+                      className="text-xs text-slate-400 hover:text-red-500 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-50"
+                      aria-label={`Delete saved search: ${search.label}`}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-8 overflow-x-auto" data-testid="tabs">

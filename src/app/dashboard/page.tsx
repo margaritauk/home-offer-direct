@@ -935,27 +935,41 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
-              <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
-                <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {AI_RECS.map(rec => {
-                  const Icon = rec.icon;
-                  return (
-                    <div key={rec.title} className="p-4 sm:p-7">
-                      <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
-                        <Icon className="w-4 h-4" />
+            <div className="space-y-5">
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm">
+                <div className="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100">
+                  <h2 className="font-semibold text-slate-900">AI Recommendations</h2>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {AI_RECS.map(rec => {
+                    const Icon = rec.icon;
+                    return (
+                      <div key={rec.title} className="p-4 sm:p-7">
+                        <div className={`w-9 h-9 ${rec.color} rounded-xl flex items-center justify-center mb-5`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <h3 className="text-sm font-semibold text-slate-900 mb-2">{rec.title}</h3>
+                        <p className="text-xs text-slate-500 leading-relaxed mb-4">{rec.desc}</p>
+                        <Link href={rec.action === "Browse Homes" ? "/search" : "/offer-builder"}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                          {rec.action} <ChevronRight className="w-3 h-3" />
+                        </Link>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-900 mb-2">{rec.title}</h3>
-                      <p className="text-xs text-slate-500 leading-relaxed mb-4">{rec.desc}</p>
-                      <Link href={rec.action === "Browse Homes" ? "/search" : "/offer-builder"}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1">
-                        {rec.action} <ChevronRight className="w-3 h-3" />
-                      </Link>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Next Steps — service providers shortcut */}
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-5">
+                <h2 className="font-semibold text-slate-900 text-sm mb-1">Next Steps</h2>
+                <p className="text-xs text-slate-500 leading-relaxed mb-4">
+                  When your offer is accepted you&apos;ll need attorneys, inspectors, lenders, and movers. Get ahead of it now.
+                </p>
+                <Link href="/services"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+                  Browse service providers <ChevronRight className="w-3 h-3"/>
+                </Link>
               </div>
             </div>
           </div>

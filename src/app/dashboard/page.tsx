@@ -101,6 +101,16 @@ const STATUS_GUIDANCE: Record<string, string> = {
   withdrawn: "Offer withdrawn. You can start a new offer anytime.",
 };
 
+/* ── Post-acceptance checklist steps ────────────────────────────── */
+const NEXT_STEPS_CHECKLIST = [
+  { id: 1, label: "Review your accepted offer with a licensed real estate attorney", desc: "5-day IL attorney review period begins from acceptance date." },
+  { id: 2, label: "Order a home inspection within your contingency window", desc: "Schedule an inspector as soon as possible to meet your deadline." },
+  { id: 3, label: "Submit your mortgage application if using financing", desc: "Contact your lender immediately to start the formal loan process." },
+  { id: 4, label: "Follow up with your lender for appraisal scheduling", desc: "Your lender will order an appraisal — confirm the timeline." },
+  { id: 5, label: "Clear all contingencies before the deadline", desc: "Remove inspection, financing, and any other contingencies in writing." },
+  { id: 6, label: "Prepare for closing — schedule a final walkthrough", desc: "Do a final walkthrough 24 hours before closing to verify the home's condition." },
+];
+
 /* ── Journey milestones ─────────────────────────────────────────── */
 type MilestoneStatus = "done" | "active" | "upcoming";
 const MILESTONES: { title:string; sub:string; status:MilestoneStatus; date?:string; warn?:boolean }[] = [
@@ -163,6 +173,13 @@ interface StatusModalState {
   guidanceMessage: string | null;
 }
 
+/* ── Withdraw confirmation modal state ──────────────────────────────── */
+interface WithdrawModalState {
+  offerId: string;
+  submitting: boolean;
+  error: string | null;
+}
+
 /* ── Verify identity card state ─────────────────────────────────────── */
 interface VerifyState {
   idUploaded: boolean;
@@ -191,6 +208,9 @@ export default function DashboardPage() {
   const [dbOffers, setDbOffers] = useState<ExtendedOffer[]>([]);
   const [offersLoading, setOffersLoading] = useState(false);
   const [statusModal, setStatusModal] = useState<StatusModalState | null>(null);
+  const [withdrawModal, setWithdrawModal] = useState<WithdrawModalState | null>(null);
+  /* Maps offerId → Set of checked step IDs — persisted to localStorage */
+  const [checklistState, setChecklistState] = useState<Record<string, Set<number>>>({});
   /* Maps offer ID → send-to-agent async state */
   const [sendAgentState, setSendAgentState] = useState<Record<string, SendAgentState>>({});
 
@@ -279,6 +299,36 @@ export default function DashboardPage() {
       } catch { /* non-fatal */ }
     })();
   }, [user?.id]);
+
+  /* ── Load acceptance checklist state from localStorage ──────────── */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("hod_acceptance_checklist");
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, number[]>;
+        const loaded: Record<string, Set<number>> = {};
+        for (const [k, v] of Object.entries(parsed)) {
+          loaded[k] = new Set(v);
+        }
+        setChecklistState(loaded);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  function toggleChecklistStep(offerId: string, stepId: number) {
+    setChecklistState(prev => {
+      const current = new Set(prev[offerId] ?? []);
+      if (current.has(stepId)) current.delete(stepId);
+      else current.add(stepId);
+      const next = { ...prev, [offerId]: current };
+      try {
+        const serializable: Record<string, number[]> = {};
+        for (const [k, s] of Object.entries(next)) serializable[k] = [...s];
+        localStorage.setItem("hod_acceptance_checklist", JSON.stringify(serializable));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   /* ── Handle identity document upload ─────────────────────────────── */
   async function handleVerifyUpload(file: File, type: "id" | "proof_of_funds") {
@@ -465,6 +515,35 @@ export default function DashboardPage() {
     }
   }
 
+  /* ── Withdraw offer handler ─────────────────────────────────────── */
+  async function handleWithdrawConfirm() {
+    if (!withdrawModal) return;
+    setWithdrawModal(prev => prev ? { ...prev, submitting: true, error: null } : prev);
+    try {
+      const res = await fetch(`/api/offers/${withdrawModal.offerId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "withdrawn" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Failed to withdraw offer");
+      }
+      const newLabel = STATUS_LABEL["withdrawn"] ?? "Withdrawn";
+      setDbOffers(prev =>
+        prev.map(o =>
+          o.id === withdrawModal.offerId
+            ? { ...o, status: "withdrawn" as UserOffer["status"], label: newLabel }
+            : o
+        )
+      );
+      setWithdrawModal(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to withdraw. Please try again.";
+      setWithdrawModal(prev => prev ? { ...prev, submitting: false, error: msg } : prev);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -533,6 +612,40 @@ export default function DashboardPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Withdraw Confirmation Modal ────────────────────────────────── */}
+      {withdrawModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-7">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-500"/>
+              </div>
+              <h3 className="text-base font-semibold text-slate-900">Withdraw offer?</h3>
+            </div>
+            <p className="text-sm text-slate-600 leading-relaxed mb-6">
+              Are you sure you want to withdraw this offer? This cannot be undone.
+            </p>
+            {withdrawModal.error && (
+              <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4">{withdrawModal.error}</p>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setWithdrawModal(null)}
+                disabled={withdrawModal.submitting}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 font-semibold rounded-xl text-sm hover:bg-slate-50 disabled:opacity-50">
+                Cancel
+              </button>
+              <button
+                onClick={handleWithdrawConfirm}
+                disabled={withdrawModal.submitting}
+                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-colors disabled:opacity-50">
+                {withdrawModal.submitting ? "Withdrawing…" : "Withdraw offer"}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -874,10 +987,10 @@ export default function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              (["pending","submitted","draft","accepted","rejected","withdrawn"] as const).map(status => {
+              (["pending","counter","submitted","draft","accepted","rejected","withdrawn"] as const).map(status => {
                 const group = activeOffers.filter(o => o.status === status);
                 if (!group.length) return null;
-                const statusLabel = { pending:"Pending", submitted:"Submitted", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted", withdrawn:"Withdrawn" }[status];
+                const statusLabel = { pending:"Pending", counter:"Counter-Offer Received", submitted:"Submitted", draft:"Draft", accepted:"Accepted", rejected:"Not Accepted", withdrawn:"Withdrawn" }[status];
                 return (
                   <div key={status}>
                     <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">{statusLabel}</h3>
@@ -917,6 +1030,39 @@ export default function DashboardPage() {
                                 <span className="font-medium text-slate-700">Notes: </span>{offer.notes}
                               </p>
                             )}
+                            {/* ── Post-acceptance checklist ──────────────────────── */}
+                            {offer.status === "accepted" && (
+                              <div className="mt-5 bg-green-50 border border-green-200 rounded-xl p-4 sm:p-5">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0"/>
+                                  <h4 className="text-sm font-semibold text-green-800">What happens next?</h4>
+                                  <Link href="/services" className="ml-auto text-xs text-green-700 font-semibold hover:underline flex items-center gap-1">
+                                    Find service providers <ChevronRight className="w-3 h-3"/>
+                                  </Link>
+                                </div>
+                                <ol className="space-y-3">
+                                  {NEXT_STEPS_CHECKLIST.map(step => {
+                                    const checked = checklistState[offer.id]?.has(step.id) ?? false;
+                                    return (
+                                      <li key={step.id} className="flex items-start gap-3">
+                                        <button
+                                          onClick={() => toggleChecklistStep(offer.id, step.id)}
+                                          aria-label={checked ? `Uncheck: ${step.label}` : `Check: ${step.label}`}
+                                          className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-green-600 border-green-600" : "border-green-400 bg-white hover:border-green-600"}`}>
+                                          {checked && <CheckCircle2 className="w-3 h-3 text-white"/>}
+                                        </button>
+                                        <div>
+                                          <p className={`text-xs font-semibold leading-snug ${checked ? "line-through text-slate-400" : "text-slate-800"}`}>
+                                            {step.id}. {step.label}
+                                          </p>
+                                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.desc}</p>
+                                        </div>
+                                      </li>
+                                    );
+                                  })}
+                                </ol>
+                              </div>
+                            )}
                             <div className="flex items-center gap-2 sm:gap-3 mt-4 sm:mt-6 flex-wrap">
                               {offer.status==="draft" && (
                                 <Link href="/offer-builder"
@@ -927,6 +1073,13 @@ export default function DashboardPage() {
                               {offer.status==="pending" && (
                                 <button className="flex items-center gap-1.5 text-sm px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100">
                                   <MessageSquare className="w-4 h-4"/> Follow Up
+                                </button>
+                              )}
+                              {(offer.status==="pending" || offer.status==="counter") && (
+                                <button
+                                  onClick={() => setWithdrawModal({ offerId: offer.id, submitting: false, error: null })}
+                                  className="flex items-center gap-1.5 text-sm px-4 py-2 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 border border-red-100">
+                                  <X className="w-4 h-4"/> Withdraw
                                 </button>
                               )}
                               {offer.status==="rejected" && (

@@ -132,11 +132,45 @@ function SearchContent() {
   const [beds, setBeds] = useState(FILTER_DEFAULTS.beds);
   const [propType, setPropType] = useState(FILTER_DEFAULTS.propType);
   const [legalModalPropertyId, setLegalModalPropertyId] = useState<string | null>(null);
+  // Inline status alert for non-Active listings (#315)
+  const [statusAlert, setStatusAlert] = useState<{ type: "pending" | "blocked"; message: string; propertyId: string } | null>(null);
 
   // Track whether we've loaded filters from storage (avoid overwriting on mount)
   const filtersLoaded = useRef(false);
 
   const handleMakeOffer = (propertyId: string) => {
+    // Find the property to check its status (#315)
+    const property = properties.find(p => p.id === propertyId);
+    const status = property?.status;
+
+    if (status === "Sold" || status === "Withdrawn") {
+      setStatusAlert({
+        type: "blocked",
+        message: "This listing is no longer active. Search for other homes.",
+        propertyId,
+      });
+      return;
+    }
+
+    if (status === "Pending") {
+      setStatusAlert({
+        type: "pending",
+        message: "This listing is under contract. You can still prepare your offer for backup position.",
+        propertyId,
+      });
+      // Still proceed to offer builder with backup flag
+      try {
+        const key = `hod-legal-ack-${propertyId}`;
+        if (localStorage.getItem(key)) {
+          router.push(`/offer-builder?property=${propertyId}&backup=true`);
+          return;
+        }
+      } catch {}
+      setLegalModalPropertyId(propertyId);
+      return;
+    }
+
+    // Active or unknown status — normal flow
     try {
       const key = `hod-legal-ack-${propertyId}`;
       if (localStorage.getItem(key)) {
@@ -152,12 +186,15 @@ function SearchContent() {
   const [saveLabel, setSaveLabel] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saveBanner, setSaveBanner] = useState(false);
+  const [alertFrequency, setAlertFrequency] = useState<"immediate" | "daily" | "weekly">("daily");
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Properties state — starts with mock data, replaced by DB data when available
   const [properties, setProperties] = useState<Property[]>(ALL_PROPERTIES);
   const [propertiesLoading, setPropertiesLoading] = useState(SUPABASE_ENABLED);
   const [usingDbProperties, setUsingDbProperties] = useState(false);
+  // Timestamp of when data was loaded (#314)
+  const [dataLoadedAt, setDataLoadedAt] = useState<Date>(() => new Date());
 
   // Realtime new-listings state
   const [newListingsCount, setNewListingsCount] = useState(0);
@@ -230,9 +267,11 @@ function SearchContent() {
         if (error || !data || data.length === 0) {
           // Fall back to mock data on error or empty result
           setProperties(ALL_PROPERTIES);
+          setDataLoadedAt(new Date());
         } else {
           setProperties((data as DbPropertyRow[]).map(dbRowToProperty));
           setUsingDbProperties(true);
+          setDataLoadedAt(new Date());
         }
       } catch {
         if (!cancelled) setProperties(ALL_PROPERTIES);
@@ -313,6 +352,7 @@ function SearchContent() {
           price_max: priceMax ? parseInt(priceMax.replace(/\D/g, "")) : null,
           min_beds: beds !== "any" ? parseInt(beds) : null,
           property_types: propType !== "any" ? [propType] : [],
+          alert_frequency: alertFrequency,
         }),
       });
       if (!res.ok) {
@@ -414,6 +454,25 @@ function SearchContent() {
                     className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
                     placeholder="Search label"
                   />
+                  {/* Alert frequency radio group (#331) */}
+                  <p className="text-xs font-medium text-slate-600 mb-1.5">Alert frequency</p>
+                  <div className="flex flex-col gap-1.5 mb-3">
+                    {(["immediate", "daily", "weekly"] as const).map(freq => (
+                      <label key={freq} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="alert_frequency"
+                          value={freq}
+                          checked={alertFrequency === freq}
+                          onChange={() => setAlertFrequency(freq)}
+                          className="accent-blue-600"
+                        />
+                        <span className="text-sm text-slate-700 capitalize">
+                          {freq === "immediate" ? "Immediately" : freq === "daily" ? "Daily digest" : "Weekly digest"}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                   {saveError && (
                     <p className="text-xs text-red-600 mb-2">{saveError}</p>
                   )}
@@ -454,10 +513,16 @@ function SearchContent() {
         </div>
       </div>
 
-      {/* Save search success banner */}
+      {/* Save search success banner (#331) */}
       {saveBanner && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm font-medium px-6 py-3 rounded-xl shadow-lg">
-          Search saved! We&apos;ll find new matches for you.
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white text-sm font-medium px-6 py-3 rounded-xl shadow-lg flex items-center gap-3">
+          <span>Search saved! We&apos;ll email you when new matching listings appear.</span>
+          <Link
+            href="/dashboard#saved-searches"
+            className="underline text-white/90 hover:text-white whitespace-nowrap text-xs font-normal"
+          >
+            View saved searches
+          </Link>
         </div>
       )}
 
@@ -477,7 +542,21 @@ function SearchContent() {
             <h1 className="text-base sm:text-xl font-bold text-slate-900">
               {propertiesLoading ? "Loading homes..." : `${filteredProperties.length} homes for sale in Chicago, IL`}
             </h1>
-            <p className="text-sm text-slate-500 mt-0.5">Updated {new Date().toLocaleDateString("en-US",{month:"long",day:"numeric"})}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              {usingDbProperties ? (
+                <>
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-sm text-slate-500">Live MLS data</span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                  <span className="text-sm text-slate-500">
+                    Sample data · Updated {dataLoadedAt.toLocaleDateString("en-US",{month:"long",day:"numeric"})}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden sm:flex items-center gap-2 bg-blue-50 rounded-xl px-3 py-2">
@@ -492,6 +571,24 @@ function SearchContent() {
             </select>
           </div>
         </div>
+
+        {/* Inline status alert for non-Active listings (#315) */}
+        {statusAlert && (
+          <div className={`flex items-start gap-3 rounded-xl px-4 py-3 mb-6 border ${
+            statusAlert.type === "blocked"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-amber-50 border-amber-200 text-amber-800"
+          }`}>
+            <span className="flex-1 text-sm font-medium">{statusAlert.message}</span>
+            <button
+              onClick={() => setStatusAlert(null)}
+              className="text-current opacity-60 hover:opacity-100 flex-shrink-0 mt-0.5"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {propertiesLoading ? (
           /* Loading skeleton — 6 placeholder cards */
@@ -520,7 +617,7 @@ function SearchContent() {
               </div>
             ) : (
               filteredProperties.map(p => (
-                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} onMakeOffer={handleMakeOffer} />
+                <PropertyCard key={p.id} property={p} saved={isSaved(p.id)} onToggleSave={() => toggleSave(p.id)} onMakeOffer={handleMakeOffer} status={p.status} />
               ))
             )}
           </div>
@@ -556,11 +653,13 @@ export default function SearchPage() {
   );
 }
 
-function PropertyCard({ property, saved, onToggleSave, onMakeOffer }: { property: Property; saved: boolean; onToggleSave: () => void; onMakeOffer: (id: string) => void }) {
+function PropertyCard({ property, saved, onToggleSave, onMakeOffer, status }: { property: Property; saved: boolean; onToggleSave: () => void; onMakeOffer: (id: string) => void; status?: Property["status"] }) {
   const showingMailto = `mailto:${property.agentEmail}?subject=Showing request — ${property.address}&body=Hi ${property.agentName.split(" ")[0]},%0D%0A%0D%0AI'm interested in scheduling a showing for ${property.address}. Please let me know your available times.%0D%0A%0D%0AThank you!`;
 
+  const isDimmed = status === "Sold" || status === "Withdrawn";
+
   return (
-    <div className="bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group">
+    <div className={`bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 group${isDimmed ? " opacity-60" : ""}`}>
       <div className="relative h-52 overflow-hidden"
         style={{background: `linear-gradient(135deg, hsl(${property.id.charCodeAt(0) % 360},35%,82%), hsl(${(property.id.charCodeAt(0) + 80) % 360},35%,70%))`}}>
         {property.photos[0] && (
@@ -573,9 +672,24 @@ function PropertyCard({ property, saved, onToggleSave, onMakeOffer }: { property
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-        <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${property.aiColor} backdrop-blur-sm`}>
-          <Sparkles className="w-3 h-3" /> {property.aiScore} · {property.aiLabel}
-        </div>
+        {/* Status badge (#317) — replaces AI score badge when non-Active */}
+        {status === "Pending" ? (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900 backdrop-blur-sm">
+            Under Contract
+          </div>
+        ) : status === "Sold" ? (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-600 text-white backdrop-blur-sm">
+            Sold
+          </div>
+        ) : status === "Withdrawn" ? (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-500 text-white backdrop-blur-sm">
+            Withdrawn
+          </div>
+        ) : (
+          <div className={`absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${property.aiColor} backdrop-blur-sm`}>
+            <Sparkles className="w-3 h-3" /> {property.aiScore} · {property.aiLabel}
+          </div>
+        )}
         <button onClick={onToggleSave}
           title={saved ? "Remove from saved" : "Save home"}
           aria-label={saved ? `Remove ${property.address} from saved` : `Save ${property.address}`}

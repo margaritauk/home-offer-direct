@@ -65,6 +65,28 @@ interface DbPropertyRow {
   img: string | null;
 }
 
+// Verified Unsplash house exterior + interior photo IDs
+const HOUSE_EXTERIOR_IDS = [
+  "_jh0Rx42TzQ", "ItiOAk9yv6Y", "NcVOI8QOyFA", "z11gbBo13ro", "esx_MLBNOEI",
+  "hPu2n_SfV7Q", "ntJvpk36rbA", "3qRx6B4cT6g", "8lLy5VR5l1w", "j3l5s6TrEi8",
+  "KqrbNYj7QJQ", "4b25Ic2VjiQ", "Rb3HbkNNoLQ", "b7CZPHVtNoc", "OKkX8fv8w6I",
+];
+const HOUSE_INTERIOR_IDS = [
+  "XU_ODlSO9ac", "Hnec2oEbbxk", "JyeUdbb9TOg", "htmZWzApbJE", "YFzqRFFyauw",
+  "lIVK3z606og", "9M66C_w_ToM", "XyGvEj587Mc", "e5zPqLcPg2k", "sjMSp5YVf7s",
+];
+
+function unsplash(photoId: string, w = 600, h = 400) {
+  return `https://images.unsplash.com/photo-${photoId}?w=${w}&h=${h}&fit=crop&auto=format&q=80`;
+}
+
+// Pick a photo deterministically from a pool using a hash of the property id
+function pickPhoto(id: string, pool: string[], offset = 0): string {
+  let hash = offset;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return pool[hash % pool.length];
+}
+
 /* ── Map a DB row to the Property interface ─────────────────────────── */
 function dbRowToProperty(row: DbPropertyRow): Property {
   const price = row.price;
@@ -76,10 +98,14 @@ function dbRowToProperty(row: DbPropertyRow): Property {
   const marketTrend: string = dom < 10 ? "hot" : dom > 30 ? "cooling" : "neutral";
   const agentName = row.agent_name ?? "";
   const agentEmail = row.agent_email ?? "";
-  const rawImg = row.img ?? "";
-  // Proxy picsum through same-origin to avoid iOS cross-domain redirect blocks
-  const picsumMatch = rawImg.match(/picsum\.photos\/id\/(\d+)/);
-  const img = picsumMatch ? `/api/property-image?id=${picsumMatch[1]}` : rawImg;
+
+  // Always use verified Unsplash house photos — DB img column has landscape placeholders
+  const extId = pickPhoto(row.id, HOUSE_EXTERIOR_IDS);
+  const int1Id = pickPhoto(row.id, HOUSE_INTERIOR_IDS, 1);
+  const int2Id = pickPhoto(row.id, HOUSE_INTERIOR_IDS, 2);
+  const img = unsplash(extId);
+  const photos = [unsplash(extId, 800, 600), unsplash(int1Id, 800, 600), unsplash(int2Id, 800, 600)];
+
   return {
     id: row.id,
     address: row.address,
@@ -97,7 +123,7 @@ function dbRowToProperty(row: DbPropertyRow): Property {
     agentEmail,
     brokerage: row.brokerage ?? "",
     img,
-    photos: img ? [img] : [],
+    photos,
     type: "Single Family",
     priceHistory: "same",
     priceChange: 0,
